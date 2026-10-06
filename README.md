@@ -57,22 +57,34 @@ cd Compositional-Continual-Learning-Benchmark
 
 ### Option B: Docker
 
+`docker/run.sh` wraps the Docker commands.
+
 1. Build the image. It contains only the environment; the repository is
    mounted when the container starts.
 
    ```bash
-   docker build -t cclb .
+   bash docker/run.sh build
    ```
 
-2. Start a shell in the container from the repository root:
+2. Optionally, store your W&B settings in `.env`, which is not committed:
 
    ```bash
-   docker run --rm -it --gpus all -u "$(id -u):$(id -g)" \
-       -v "$PWD":/workspace -e WANDB_API_KEY cclb
+   cp .env.example .env    # then uncomment and set WANDB_API_KEY
    ```
 
-   Commands in the rest of this guide run unchanged inside this shell. Files
-   written under `/workspace`, such as logs, appear in your checkout.
+3. Start a shell in the container, or run a single command:
+
+   ```bash
+   bash docker/run.sh
+   bash docker/run.sh python scripts/check_env.py
+   ```
+
+   Inside the container you are a user with your host name and IDs and
+   passwordless `sudo`, the repository is at `/workspace`, and files you
+   write there, such as logs, belong to you in your checkout. Commands in the
+   rest of this guide run unchanged inside this shell. Leave the shell with
+   `exit`; the container is then removed. A container started elsewhere can be
+   stopped with `docker ps` and `docker stop <container>`.
 
 ## Pretrained encoder
 
@@ -172,7 +184,9 @@ A successful run creates `done.flag` there; rerunning a command with
 `--rerun-failed` skips finished runs. Each training script keeps its own
 checkpointing and resume behaviour when an interrupted run is relaunched.
 
-Metrics are logged to Weights & Biases under your default account. Set
+Metrics are logged to Weights & Biases under your default account (run
+`wandb login` once in the conda environment, or set `WANDB_API_KEY` in `.env`
+for Docker). Set
 `WANDB_ENTITY` or pass `--wandb-entity TEAM` to log elsewhere, or set
 `WANDB_MODE=offline` to log locally. The launcher stores each run's W&B ID in
 its log directory so a resumed run continues the same W&B run.
@@ -206,6 +220,7 @@ scripts/check_env.py   installation check
 environment.yml        conda environment
 requirements.txt       Python packages
 Dockerfile             container image
+docker/                container entrypoint and run helper
 provenance/            migration and environment-validation records
 ```
 

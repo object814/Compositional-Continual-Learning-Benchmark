@@ -2,3 +2,4 @@
 *
 !environment.yml
 !requirements.txt
+!docker/entrypoint.sh
