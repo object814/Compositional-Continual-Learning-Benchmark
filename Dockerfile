@@ -1,34 +1,31 @@
-# Environment for all baselines; the repository is mounted at /workspace at run time.
-# Build and use with docker/run.sh:
-#   bash docker/run.sh build
-#   bash docker/run.sh          # shell in a long-lived container
-#   bash docker/run.sh stop
+# Environment for all baselines. The image holds only the Python environment;
+# the repository is mounted at /workspace when the container starts (see README).
 #
 # Debian 12 provides a C++ runtime (libstdc++) new enough for the compiled
 # tensordict extension; Python packages come from requirements.txt.
 FROM python:3.10-slim-bookworm
 
 # libOSMesa for offscreen MuJoCo rendering, OpenGL/GLib runtime libraries,
-# sudo, and tmux for sessions that keep running inside the container.
+# and tmux for sessions that keep running inside the container.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        libosmesa6 libgl1 libegl1 libglib2.0-0 sudo tmux \
+        libosmesa6 libgl1 libegl1 libglib2.0-0 tmux \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt /opt/cclb-env/requirements.txt
-RUN PYTHONNOUSERSITE=1 pip install --no-cache-dir -r /opt/cclb-env/requirements.txt
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
-# Runs commands as a user matching the host user (see docker/entrypoint.sh).
-COPY docker/entrypoint.sh /usr/local/bin/cclb-entrypoint
-RUN chmod 755 /usr/local/bin/cclb-entrypoint
-
-# Same variables as environment.yml. HOME=/tmp is a writable fallback; the
-# entrypoint sets the user's home directory.
+# Same rendering variables as environment.yml. The container runs as the host
+# user (docker run --user, or user: in compose.yaml), who has no entry in /etc/passwd: USER gives
+# getpass.getuser() (used by torch.compile) a name, and HOME a writable directory.
 ENV MUJOCO_GL=osmesa \
     PYOPENGL_PLATFORM=osmesa \
     PYTHONNOUSERSITE=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    HOME=/tmp
+    USER=cclb \
+    HOME=/tmp \
+    SHELL=/bin/bash
 WORKDIR /workspace
-ENTRYPOINT ["cclb-entrypoint"]
-CMD ["bash"]
+
+# Keep the container alive in the background; open shells with docker exec.
+CMD ["sleep", "infinity"]

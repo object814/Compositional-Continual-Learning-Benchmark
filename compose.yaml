@@ -1,0 +1,22 @@
+# Long-lived container with the repository mounted at /workspace (see README).
+#   docker compose up -d             # build if needed, start in the background
+#   docker compose exec cclb bash    # open a shell
+#   docker compose down              # stop and remove
+services:
+  cclb:
+    build: .
+    image: cclb
+    init: true
+    shm_size: 16g
+    # Run as the host user so files written to the repository belong to them.
+    user: "${HOST_UID:?set HOST_UID and HOST_GID in .env (see README)}:${HOST_GID:?set HOST_GID in .env (see README)}"
+    env_file: .env
+    volumes:
+      - .:/workspace
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
