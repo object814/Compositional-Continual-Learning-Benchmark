@@ -1,7 +1,8 @@
 # Environment for all baselines; the repository is mounted at /workspace at run time.
-# Build and run with docker/run.sh:
+# Build and use with docker/run.sh:
 #   bash docker/run.sh build
-#   bash docker/run.sh
+#   bash docker/run.sh          # shell in a long-lived container
+#   bash docker/run.sh stop
 FROM condaforge/miniforge3:24.11.3-0
 
 # libOSMesa for offscreen MuJoCo rendering, OpenGL/GLib runtime libraries, and sudo.
@@ -25,6 +26,11 @@ RUN for f in /etc/skel/.bashrc /root/.bashrc; do \
         grep -q 'conda activate /opt/cclb' "$f" \
             || echo '. /opt/conda/etc/profile.d/conda.sh && conda activate /opt/cclb' >> "$f"; \
     done
+
+# tmux, for sessions that keep running inside the long-lived container.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tmux \
+    && rm -rf /var/lib/apt/lists/*
 
 # Same variables as environment.yml. HOME=/tmp is a writable fallback; the
 # entrypoint sets the user's home directory.

@@ -80,34 +80,54 @@ the files you create would belong to root.
    cp .env.example .env
    ```
 
-   The container reads `.env` when it starts; after editing the file, start
-   a new container.
+   The container reads `.env` when it starts. After editing the file, restart
+   the container with `bash docker/run.sh stop` followed by
+   `bash docker/run.sh`.
 
-3. Start a shell in the container, or run a single command:
+3. Open a shell in the container, or run a single command:
 
    ```bash
    bash docker/run.sh
    bash docker/run.sh python scripts/check_env.py
    ```
 
-   Inside the container the environment is active (the shell prompt starts
-   with `(/opt/cclb)`), you are a user with your host name and IDs and
-   passwordless `sudo`, the repository is at `/workspace`, and files you
-   write there, such as logs and checkpoints, are the same files as in your
-   checkout. Commands in the rest of this guide run unchanged inside this
-   shell. Leave the shell with `exit`; the container is then removed. A
-   container started elsewhere can be stopped with `docker ps` and
-   `docker stop <container>`.
+   The first call starts a container named `cclb-<your user name>` in the
+   background; later calls open new shells in the same container. Inside it
+   the environment is active (the shell prompt starts with `(/opt/cclb)`),
+   you are a user with your host name and IDs and passwordless `sudo`, the
+   repository is at `/workspace`, and files you write there, such as logs and
+   checkpoints, are the same files as in your checkout. Commands in the rest
+   of this guide run unchanged inside this shell.
 
-   The container stops when its terminal closes, so start long runs inside
-   `tmux` or `screen` on the host.
+4. Keep long runs going after you leave. The container keeps running when
+   you `exit` a shell, so start runs inside `tmux`:
 
-Two optional settings for `docker/run.sh` can be set in your host shell, for
-example `CCLB_SHM_SIZE=32g bash docker/run.sh`:
+   ```bash
+   bash docker/run.sh          # shell in the container
+   tmux new -s train           # start a tmux session, then launch training
+   # detach with Ctrl-b d, then exit the shell; training keeps running
+   bash docker/run.sh          # later: a new shell in the same container
+   tmux attach -t train        # back to the training session
+   ```
+
+5. When you are finished, stop and remove the container. This ends
+   everything running inside it, including tmux sessions:
+
+   ```bash
+   bash docker/run.sh stop
+   ```
+
+   After rebuilding the image, `docker/run.sh` reminds you that the running
+   container still uses the old one; stop it and open a new shell to switch.
+
+Optional settings for `docker/run.sh`, set in your host shell, for example
+`CCLB_SHM_SIZE=32g bash docker/run.sh`. Container settings take effect when a
+container starts:
 
 | Setting | Meaning | Default |
 | --- | --- | --- |
-| `CCLB_IMAGE` | Image name used by `build` and when starting containers. | `cclb` |
+| `CCLB_IMAGE` | Image name used by `build` and when starting the container. | `cclb` |
+| `CCLB_CONTAINER` | Name of the container. Set different names to run several containers at once. | `cclb-<your user name>` |
 | `CCLB_SHM_SIZE` | Shared memory for the container. Increase it if DreamerV3 reports shared-memory errors. | `16g` |
 
 ## Pretrained encoder
