@@ -18,6 +18,14 @@ RUN PYTHONNOUSERSITE=1 conda env create -p /opt/cclb -f /opt/cclb-env/environmen
 COPY docker/entrypoint.sh /usr/local/bin/cclb-entrypoint
 RUN chmod 755 /usr/local/bin/cclb-entrypoint
 
+# The base image's .bashrc activates conda's own "base" environment, which
+# would shadow /opt/cclb in interactive shells; activate /opt/cclb instead.
+RUN for f in /etc/skel/.bashrc /root/.bashrc; do \
+        sed -i 's#conda activate base#conda activate /opt/cclb#' "$f"; \
+        grep -q 'conda activate /opt/cclb' "$f" \
+            || echo '. /opt/conda/etc/profile.d/conda.sh && conda activate /opt/cclb' >> "$f"; \
+    done
+
 # Same variables as environment.yml. HOME=/tmp is a writable fallback; the
 # entrypoint sets the user's home directory.
 ENV PATH=/opt/cclb/bin:$PATH \

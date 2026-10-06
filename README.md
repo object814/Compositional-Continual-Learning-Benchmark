@@ -57,30 +57,58 @@ cd Compositional-Continual-Learning-Benchmark
 
 ### Option B: Docker
 
-`docker/run.sh` wraps the Docker commands.
+`docker/run.sh` wraps the Docker commands. Your user must be able to run
+`docker` without `sudo` (see Docker's
+[post-installation steps](https://docs.docker.com/engine/install/linux-postinstall/)).
+Do not run the helper with `sudo`: you would be root inside the container and
+the files you create would belong to root.
 
 1. Build the image. It contains only the environment; the repository is
-   mounted when the container starts.
+   mounted when the container starts, so code changes need no rebuild.
+   Rebuild after changes to `environment.yml`, `requirements.txt`,
+   `Dockerfile` or `docker/entrypoint.sh`. The first build downloads several
+   GB.
 
    ```bash
    bash docker/run.sh build
    ```
 
-2. Start a shell in the container, or run a single command:
+2. Create your W&B settings file (see [Weights & Biases](#weights--biases)
+   for what to put in it):
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   The container reads `.env` when it starts; after editing the file, start
+   a new container.
+
+3. Start a shell in the container, or run a single command:
 
    ```bash
    bash docker/run.sh
    bash docker/run.sh python scripts/check_env.py
    ```
 
-   Inside the container you are a user with your host name and IDs and
+   Inside the container the environment is active (the shell prompt starts
+   with `(/opt/cclb)`), you are a user with your host name and IDs and
    passwordless `sudo`, the repository is at `/workspace`, and files you
-   write there, such as logs, belong to you in your checkout. Your W&B
-   settings in `.env` are passed in automatically (see
-   [Weights & Biases](#weights--biases)). Commands in the rest of this guide
-   run unchanged inside this shell. Leave the shell with `exit`; the
-   container is then removed. A container started elsewhere can be stopped
-   with `docker ps` and `docker stop <container>`.
+   write there, such as logs and checkpoints, are the same files as in your
+   checkout. Commands in the rest of this guide run unchanged inside this
+   shell. Leave the shell with `exit`; the container is then removed. A
+   container started elsewhere can be stopped with `docker ps` and
+   `docker stop <container>`.
+
+   The container stops when its terminal closes, so start long runs inside
+   `tmux` or `screen` on the host.
+
+Two optional settings for `docker/run.sh` can be set in your host shell, for
+example `CCLB_SHM_SIZE=32g bash docker/run.sh`:
+
+| Setting | Meaning | Default |
+| --- | --- | --- |
+| `CCLB_IMAGE` | Image name used by `build` and when starting containers. | `cclb` |
+| `CCLB_SHM_SIZE` | Shared memory for the container. Increase it if DreamerV3 reports shared-memory errors. | `16g` |
 
 ## Pretrained encoder
 
@@ -114,9 +142,13 @@ Then edit `.env`:
 | `WANDB_MODE` | Where metrics go. | `online` (default when unset): upload to wandb.ai. `offline`: save only in each run's log directory; upload later with `wandb sync <run directory>/wandb/offline-run-*`. `disabled`: no W&B logging. |
 
 Only `WANDB_API_KEY` is needed for the usual setup; leave the other two
-commented out unless you need them.
+commented out unless you need them. Without an API key, set `WANDB_MODE` to
+`offline` or `disabled`. Write each value without quotes or spaces, for
+example `WANDB_API_KEY=0123abcd`, because Docker keeps quotes as part of the
+value.
 
-- **Docker:** `docker/run.sh` passes `.env` into the container automatically.
+- **Docker:** `docker/run.sh` passes `.env` into the container automatically
+  each time a container starts.
 - **Conda:** load `.env` into your shell before training:
 
   ```bash
