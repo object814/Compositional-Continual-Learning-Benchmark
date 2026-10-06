@@ -26,7 +26,7 @@ All baselines render MuJoCo scenes offscreen with OSMesa, on the CPU.
 Clone the repository and work from its root directory:
 
 ```bash
-git clone <repository-url> Compositional-Continual-Learning-Benchmark
+git clone https://github.com/object814/Compositional-Continual-Learning-Benchmark.git
 cd Compositional-Continual-Learning-Benchmark
 ```
 
@@ -77,7 +77,8 @@ cd Compositional-Continual-Learning-Benchmark
 ## Pretrained encoder
 
 The pretrained-encoder runs of TD-MPC2 and PWM load
-`checkpoints/encoder_ms19.pt`. Place the released checkpoint there:
+`checkpoints/encoder_ms19.pt`. The checkpoint is distributed separately from
+the repository; place it there:
 
 ```bash
 mkdir -p checkpoints
@@ -205,6 +206,7 @@ scripts/check_env.py   installation check
 environment.yml        conda environment
 requirements.txt       Python packages
 Dockerfile             container image
+provenance/            migration and environment-validation records
 ```
 
 PWM expert-reuse analysis is in `baselines/pwm/tdmpc2/expert_reuse/`; see its
