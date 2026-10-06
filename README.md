@@ -66,13 +66,7 @@ cd Compositional-Continual-Learning-Benchmark
    bash docker/run.sh build
    ```
 
-2. Optionally, store your W&B settings in `.env`, which is not committed:
-
-   ```bash
-   cp .env.example .env    # then uncomment and set WANDB_API_KEY
-   ```
-
-3. Start a shell in the container, or run a single command:
+2. Start a shell in the container, or run a single command:
 
    ```bash
    bash docker/run.sh
@@ -184,11 +178,10 @@ A successful run creates `done.flag` there; rerunning a command with
 `--rerun-failed` skips finished runs. Each training script keeps its own
 checkpointing and resume behaviour when an interrupted run is relaunched.
 
-Metrics are logged to Weights & Biases under your default account (run
-`wandb login` once in the conda environment, or set `WANDB_API_KEY` in `.env`
-for Docker). Set
-`WANDB_ENTITY` or pass `--wandb-entity TEAM` to log elsewhere, or set
-`WANDB_MODE=offline` to log locally. The launcher stores each run's W&B ID in
+Metrics are logged to Weights & Biases under your default account. Run
+`wandb login` once in the conda environment; with Docker, run it in the
+container shell before training. Pass `--wandb-entity TEAM` to log to a team
+instead. The launcher stores each run's W&B ID in
 its log directory so a resumed run continues the same W&B run.
 
 ## Tasks and curricula
