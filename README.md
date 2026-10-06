@@ -194,9 +194,13 @@ value.
    of 18.
 
 2. Optionally, run short end-to-end smoke tests. `--smoke` trains each
-   selected run for 3,000 steps per task with seed 0, logs to `smoke_logs/`,
-   and logs W&B offline unless `WANDB_MODE` is set. One command per method
-   and encoder variant:
+   selected run for 3,000 steps per task (`--smoke-steps` changes this) with
+   seed 0, through warm-up, training updates, evaluation and task switches.
+   It keeps nothing: no replay episodes, videos or periodic checkpoints are
+   saved, W&B runs offline unless `WANDB_MODE` is set, and the files a method
+   needs while running go to a temporary directory (`/tmp/cclb-smoke/`) that
+   is deleted when the run passes. If a run fails, its directory is kept and
+   its path printed. One command per method and encoder variant:
 
    ```bash
    python scripts/launch.py tdmpc2 sweep_sequential_regular.yaml --smoke --taskset grasp
@@ -212,6 +216,13 @@ value.
    A single-task smoke run takes about 15 minutes and a three-task curriculum
    about 2 hours on one GPU, mostly spent rendering. Add `--encoder scratch`
    to skip the pretrained-encoder runs.
+
+On a machine with several GPUs, choose one with `CUDA_VISIBLE_DEVICES`,
+numbered as in `nvidia-smi`, before starting runs (here the second GPU):
+
+```bash
+export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=1
+```
 
 ## Running experiments
 

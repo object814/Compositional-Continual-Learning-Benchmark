@@ -9,8 +9,10 @@ import os
 from pathlib import Path
 import secrets
 import shlex
+import shutil
 import subprocess
 import sys
+import tempfile
 
 import yaml
 
@@ -21,7 +23,7 @@ from sweep_config import (
 
 ROOT = Path(__file__).resolve().parents[1]
 ENCODER_VARIANTS = ('scratch', 'pretrained')
-SMOKE_LOGDIR = 'smoke_logs'
+SMOKE_LOGDIR = Path(tempfile.gettempdir()) / 'cclb-smoke'  # outside the repository; removed per run
 SEED_STEPS = 1250  # TD-MPC2/PWM warm-up: max(1000, 5 * 250-step episodes)
 
 
@@ -47,8 +49,10 @@ def parse_args(argv=None):
                         help='Fine-tune the pretrained encoder.')
     parser.set_defaults(freeze_encoder=True)
     parser.add_argument('--smoke', action='store_true',
-                        help='Short end-to-end runs for environment testing: tiny budgets, seed 0 unless '
-                        f'--seeds is given, logs under {SMOKE_LOGDIR}/, W&B offline unless WANDB_MODE is set.')
+                        help='Short end-to-end runs for testing an installation: tiny budgets, seed 0 unless '
+                        '--seeds is given, W&B offline unless WANDB_MODE is set, no replay episodes, videos or '
+                        f'periodic checkpoints. Remaining outputs go to {SMOKE_LOGDIR}/ and are deleted after '
+                        'each successful run.')
     parser.add_argument('--smoke-steps', type=int, default=3000, help='Environment steps per task with --smoke.')
     args = parser.parse_args(argv)
     if args.max_jobs is not None and args.max_jobs < 1:
@@ -143,21 +147,41 @@ def expand_encoder_variants(args, cfg, jobs):
     return expanded
 
 
+def without_episode_saving(args):
+    """Drop --save-episodes and --prune-every-n-episodes N from a sequential job's extra arguments."""
+    kept, skip = [], False
+    for arg in args:
+        if skip:
+            skip = False
+        elif arg == '--prune-every-n-episodes':
+            skip = True
+        elif arg != '--save-episodes':
+            kept.append(arg)
+    return kept
+
+
 def apply_smoke(baseline, jobs, steps):
-    """Shrink budgets so every phase (warm-up, updates, evaluation, checkpoints, task switches) runs briefly."""
+    """Shrink budgets so warm-up, updates, evaluation and task switches each run briefly, and save as
+    little as possible: no replay episodes, videos or periodic checkpoints. Files a method needs while
+    running, such as end-of-task models or DreamerV3's episode dataset, are still written."""
     every = max(steps // 3, 1)
     for job in jobs:
         n = len(job.get('tasks', [None]))
+        extra = list(job.get('extra_args', []))
         if baseline == 'dreamerv3':
             job['steps'] = [steps] * n
             job['dataset_sizes'] = [steps] * n
-            job['extra_args'] = list(job.get('extra_args', [])) + [
-                '--eval_every', str(every), '--log_every', str(every), '--prefill', str(min(500, steps // 4))]
+            job['extra_args'] = extra + [
+                '--eval_every', str(every), '--log_every', str(every), '--prefill', str(min(500, steps // 4)),
+                '--no-eval-prev-video']
         elif job['mode'] == 'single':
-            job.update(steps=steps, buffer_size=steps, eval_freq=every, eval_episodes=1, save_freq=every)
+            job.update(steps=steps, buffer_size=steps, eval_freq=every, eval_episodes=1, save_freq=0,
+                       save_episodes=False)
+            job['extra_args'] = extra + ['save_video=false', 'save_agent=false']
         else:
             job.update(task_steps=[steps] * n, task_buffer_sizes=[steps] * n,
-                       eval_freq=every, eval_episodes=1, save_freq=every)
+                       eval_freq=every, eval_episodes=1, save_freq=0)
+            job['extra_args'] = without_episode_saving(extra) + ['--no-save-episodes', '--no-save-video']
 
 
 def check_checkpoints(jobs):
@@ -254,6 +278,8 @@ def main(argv=None):
         run_id = None
         logdir = ROOT / job['logdir']
         if not args.dry_run:
+            if args.smoke:
+                shutil.rmtree(logdir, ignore_errors=True)  # smoke runs always start fresh
             logdir.mkdir(parents=True, exist_ok=True)
             id_file = logdir / 'wandb_run_id.txt'
             run_id = (id_file.read_text().strip() if id_file.exists() else '') or secrets.token_hex(4)
@@ -270,8 +296,14 @@ def main(argv=None):
         cmd[0] = sys.executable
         proc = subprocess.run(cmd, cwd=ROOT, env=env, check=False)
         if proc.returncode:
+            if args.smoke:
+                print(f'# Smoke run failed; its outputs are kept in {logdir}', file=sys.stderr, flush=True)
             return proc.returncode
-        (logdir / 'done.flag').touch()
+        if args.smoke:
+            shutil.rmtree(logdir, ignore_errors=True)
+            print(f'# Smoke run passed: {job["run_name"]}', flush=True)
+        else:
+            (logdir / 'done.flag').touch()
     return 0
 
 
