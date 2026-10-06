@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Training outputs and checkpoints
+baselines/*/sweep/logdir/
+smoke_logs*/
+checkpoints/
+wandb/
+outputs/
+multirun/
+*.pt
+*.pth
+
+# Local tool state
+.cache/
+.env
+.vscode/
+.idea/
+*.sif

@@ -1,0 +1,15 @@
+{
+  "job_specifications_preserved": 167,
+  "sweep_configurations": 14,
+  "dry_runs_write_no_files": true,
+  "trainer_argument_parsers_passed": true,
+  "hydra_single_task_variants_composed": 30,
+  "scratch_and_pretrained_launch_options_preserved": true,
+  "optional_wandb_entity_check_passed": true,
+  "resume_id_reuse_and_success_failure_markers_checked": true,
+  "relocation_and_relative_container_image_checks_passed": true,
+  "python_shell_yaml_syntax_passed": true,
+  "no_git_metadata": true,
+  "training_jobs_started": 0,
+  "full_training_and_container_builds": "Not run; shared dependency setup remains deferred."
+}

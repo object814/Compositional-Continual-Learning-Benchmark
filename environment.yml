@@ -1,0 +1,17 @@
+# Conda environment for all baselines:
+#   PYTHONNOUSERSITE=1 conda env create -f environment.yml
+#   conda activate cclb
+name: cclb
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - -r requirements.txt
+variables:
+  # All baselines render MuJoCo offscreen with OSMesa (system libOSMesa).
+  MUJOCO_GL: osmesa
+  PYOPENGL_PLATFORM: osmesa
+  # Ignore packages in ~/.local so only this environment's versions are used.
+  PYTHONNOUSERSITE: "1"

@@ -1,0 +1,40 @@
+<mujoco>
+    <include file="../scene/basic_scene.xml"/>
+    <include file="../objects/assets/box_dependencies.xml"/>
+    <include file="../objects/assets/xyz_base_dependencies.xml"/>
+
+    <worldbody>
+        <include file="../objects/assets/xyz_base.xml"/>
+
+        <!-- Box container (static body) -->
+        <body name="boxbody" pos="0. 0.8 0">
+            <include file="../objects/assets/box.xml"/>
+        </body>
+
+        <!-- Box lid (free body) -->
+        <body name="boxbodytop" pos="0. 0.5 0" quat="1 0 0 1">
+            <freejoint name="lid_joint"/>
+            <include file="../objects/assets/boxtop.xml"/>
+        </body>
+
+        <!-- Block object (free body) -->
+        <body name="obj" pos="0 0.6 0.02">
+            <joint name="obj" type="free" limited="false" damping="0." armature="0."/>
+            <inertial pos="0 0 0" mass=".1" diaginertia="8.80012e-04 8.80012e-04 8.80012e-04"/>
+            <geom name="objGeom" type="box" pos="0 0 0" solimp="0.99 0.99 0.01"
+                size="0.02 0.02 0.02" rgba="1 0 0 1" solref="0.01 1"
+                contype="1" conaffinity="1" friction="1 0.1 0.002" condim="4"
+            />
+        </body>
+
+        <site name="goal" pos="0. 0.7 0.05" size="0.02" rgba="0 0 0 0"/>
+    </worldbody>
+
+    <actuator>
+        <position ctrllimited="true" ctrlrange="-1 1" joint="r_close" kp="400" user="1"/>
+        <position ctrllimited="true" ctrlrange="-1 1" joint="l_close" kp="400" user="1"/>
+    </actuator>
+    <equality>
+        <weld body1="mocap" body2="hand" solref="0.02 1"></weld>
+    </equality>
+</mujoco>

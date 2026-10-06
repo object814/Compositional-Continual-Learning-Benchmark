@@ -1,0 +1,22 @@
+{
+  "<source-pwm>": {
+    "head": "e32e6702983dc7e88ab8ed0c085984a175818b37",
+    "status": " M third_party/tdmpc2\n",
+    "diff_sha256": "f8383da2a79b88190aae5168faac88072f6b9c015a9c51233feb887c66f8cb5d"
+  },
+  "<source-tdmpc2-dreamer>": {
+    "head": "3b17af1fdd520907e28b5f81a79712bd5e838bd3",
+    "status": " M metaworld/envs/compo_pickplace_boxclose.py\n M third_party/STORM\n M third_party/dreamerv3\n M third_party/tdmpc2\n D third_party/vjepa2\n?? .claude/\n?? .devcontainer/wandb/\n?? tdmpc2_conda.tar.gz\n?? tdmpc2_pip.txt\n",
+    "diff_sha256": "475dd4b294ec25716e8dc7549850fd79f5eb07d2943ce3441faaa07d88dccb10"
+  },
+  "<source-pwm>/third_party/tdmpc2": {
+    "head": "c27b01b503b39d30e496d73cc87c275e51730ab9",
+    "status": " M tdmpc2/expert_reuse/README.md\n M tdmpc2/expert_reuse/analyze.py\n M tdmpc2/expert_reuse/plots.py\n M tdmpc2/expert_reuse/rollout.py\n M tdmpc2/expert_reuse/run_all.sh\n M tdmpc2/expert_reuse/runspec.py\n M tdmpc2/sequential/sequential_train.py\n M tdmpc2/sequential/sequential_train_progressive.py\n?? tdmpc2/expert_reuse/expert_return.txt\n?? tdmpc2/expert_reuse/export_paper_data.py\n?? tdmpc2/expert_reuse/normalise.py\n?? tdmpc2/expert_reuse/paper_data.zip\n?? tdmpc2/expert_reuse/paper_data/\n?? tdmpc2/expert_reuse/test_analysis.py\n",
+    "diff_sha256": "dc94b9ff7444ac5b0d7aca26858a6e58eaf99b7b736a17202248450274316296"
+  },
+  "<source-tdmpc2-dreamer>/third_party/tdmpc2": {
+    "head": "2220916cee8f1a1c173b3f981eb935b7afa83824",
+    "status": " M .gitignore\n M tdmpc2/common/layers.py\n M tdmpc2/common/logger.py\n M tdmpc2/common/parser.py\n M tdmpc2/common/world_model.py\n M tdmpc2/config.yaml\n M tdmpc2/er_training/sequential_train_er.py\n M tdmpc2/ewc_training/ewc.py\n M tdmpc2/ewc_training/sequential_train_ewc.py\n M tdmpc2/packnet_training/packnet.py\n M tdmpc2/packnet_training/sequential_train_packnet.py\n M tdmpc2/sequential_train.py\n M tdmpc2/tdmpc2.py\n?? tdmpc2/packnet_training/verify_packnet_roundtrip.py\n?? tdmpc2/pretrain/\n?? tdmpc2/tdmpc2_original.py\n",
+    "diff_sha256": "60bf595c7d7c37d3c5ab549573a5182e0b34e962e5dbf9265de1137e73dd29f4"
+  }
+}

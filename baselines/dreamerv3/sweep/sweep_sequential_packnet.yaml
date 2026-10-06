@@ -1,0 +1,134 @@
+# Training configuration; paths are relative to the project root.
+sweep_id: sweep_seq_packnet_01
+seeds:
+- 0
+- 1
+- 2
+logdir_root: baselines/dreamerv3/sweep/logdir
+naming:
+  run_name: '{method}_{taskset}_seed{seed}'
+  wandb_group: '{method}_{taskset}'
+  wandb_tags:
+  - '{method}'
+  - '{taskset}'
+  - seed{seed}
+  - '{date}'
+  - '{sweep_id}'
+  logdir_folder: '{taskset}/seed_{seed}'
+tasksets:
+  binpnp:
+    tasks:
+    - metaworld_bin-picking-redblue-v3
+    - metaworld_bin-picking-yellowblue-v3
+    - metaworld_bin-picking-redpurple-v3
+    - metaworld_bin-picking-yellowpurple-v3
+  drawerpnp:
+    tasks:
+    - metaworld_drawer-open-v3
+    - metaworld_pick-place-v3
+    - metaworld_compo-draweropen-pickplace
+  pnpblock:
+    tasks:
+    - metaworld_pick-place-redblock-v3
+    - metaworld_pick-place-greenblock-v3
+    - metaworld_compo-pickplace-block
+  reach:
+    tasks:
+    - metaworld_reach-xy-v3
+    - metaworld_reach-xz-v3
+    - metaworld_reach-yz-v3
+    - metaworld_reach-xyz-v3
+  grasp:
+    tasks:
+    - metaworld_reach-v3
+    - metaworld_grasp-v3
+    - metaworld_pick-place-v3
+  pnpboxclose:
+    tasks:
+    - metaworld_pick-place-redblock-v3
+    - metaworld_box-close-v3
+    - metaworld_compo-pickplace-boxclose
+methods:
+  packnet:
+    entry: packnet_training/dreamer_sequential_packnet.py
+    wandb_project: Metaworld_Dreamerv3_Sequential_PackNet
+    logdir_subdir: sequential_packnet
+    extra_args:
+    - --packnet-prune-ratio
+    - '0.75'
+    - --packnet-retrain-ratio
+    - '0.1'
+    tasksets:
+      binpnp:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 700000
+        - 500000
+        - 500000
+        - 500000
+        dataset_sizes_divisor: 8
+      drawerpnp:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 200000
+        - 500000
+        - 1000000
+        dataset_sizes_divisor: 8
+      pnpblock:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 800000
+        - 500000
+        - 800000
+        dataset_sizes_divisor: 8
+      reach:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 400000
+        - 400000
+        - 400000
+        - 500000
+        dataset_sizes_divisor: 8
+      grasp:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 200000
+        - 400000
+        - 600000
+        dataset_sizes_divisor: 8
+      pnpboxclose:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 800000
+        - 500000
+        - 800000
+        dataset_sizes_divisor: 8
+matrix:
+- method: packnet
+  tasksets:
+  - binpnp
+  - drawerpnp
+  - pnpblock
+  - reach
+  - grasp
+  - pnpboxclose

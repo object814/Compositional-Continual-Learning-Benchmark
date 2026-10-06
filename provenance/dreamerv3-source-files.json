@@ -1,0 +1,578 @@
+[
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/LICENSE",
+    "destination": "baselines/dreamerv3/LICENSE",
+    "source_sha256": "2991634eca8d411611f201feafb50cb7041afbca049b6618b3be1cd515393ada",
+    "source_mtime_ns": 1770202210331265000,
+    "destination_sha256": "2991634eca8d411611f201feafb50cb7041afbca049b6618b3be1cd515393ada",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/configs.yaml",
+    "destination": "baselines/dreamerv3/configs.yaml",
+    "source_sha256": "d59f67bf473d9c3810b6b7fdd641ee7b696d95ca178b2106a01ebd0039160203",
+    "source_mtime_ns": 1777837777957351000,
+    "destination_sha256": "d59f67bf473d9c3810b6b7fdd641ee7b696d95ca178b2106a01ebd0039160203",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/dreamer.py",
+    "destination": "baselines/dreamerv3/dreamer.py",
+    "source_sha256": "d8138a5aea8f84476c8d78e341c5d4dd6272fc9bca7faaa5ec57d5ddb68a01be",
+    "source_mtime_ns": 1774877752228587000,
+    "destination_sha256": "d8138a5aea8f84476c8d78e341c5d4dd6272fc9bca7faaa5ec57d5ddb68a01be",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/dreamer_sequential.py",
+    "destination": "baselines/dreamerv3/dreamer_sequential.py",
+    "source_sha256": "a731e1130782de27a1c5a42a9d245fa51dd2cdb36d807717bfc96a874d544488",
+    "source_mtime_ns": 1777925008568492000,
+    "destination_sha256": "a731e1130782de27a1c5a42a9d245fa51dd2cdb36d807717bfc96a874d544488",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/envs/atari.py",
+    "destination": "baselines/dreamerv3/envs/atari.py",
+    "source_sha256": "099a9f1e92f25abb0f3e6ea0465d87ff15927aab064f67e5f2aae8ed05cc121d",
+    "source_mtime_ns": 1770202210339253000,
+    "destination_sha256": "099a9f1e92f25abb0f3e6ea0465d87ff15927aab064f67e5f2aae8ed05cc121d",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/envs/crafter.py",
+    "destination": "baselines/dreamerv3/envs/crafter.py",
+    "source_sha256": "8152347befbc88d252ddd2356211b0577802aaa6ea7e8d229b2ddb97f21d060f",
+    "source_mtime_ns": 1770202210341238000,
+    "destination_sha256": "8152347befbc88d252ddd2356211b0577802aaa6ea7e8d229b2ddb97f21d060f",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/envs/dmc.py",
+    "destination": "baselines/dreamerv3/envs/dmc.py",
+    "source_sha256": "0c66723bc35205dbbae0d49ece277cf3a06713debfd4eb0863c62eceebf2afb3",
+    "source_mtime_ns": 1770202210343223000,
+    "destination_sha256": "0c66723bc35205dbbae0d49ece277cf3a06713debfd4eb0863c62eceebf2afb3",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/envs/dmlab.py",
+    "destination": "baselines/dreamerv3/envs/dmlab.py",
+    "source_sha256": "8d109bb409629633262a98581dd1e29fcca39d28ac46d9eb66c6a039495223c2",
+    "source_mtime_ns": 1770202210346221000,
+    "destination_sha256": "8d109bb409629633262a98581dd1e29fcca39d28ac46d9eb66c6a039495223c2",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/envs/memorymaze.py",
+    "destination": "baselines/dreamerv3/envs/memorymaze.py",
+    "source_sha256": "5c25124c8af5d6b60b058b3e7ed7fb97135daee91b2f4f606b20ad4e1c39a030",
+    "source_mtime_ns": 1770202210347270000,
+    "destination_sha256": "5c25124c8af5d6b60b058b3e7ed7fb97135daee91b2f4f606b20ad4e1c39a030",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/envs/metaworld_wrappers.py",
+    "destination": "baselines/dreamerv3/envs/metaworld_wrappers.py",
+    "source_sha256": "f88c8f2b522f8204a1761b04931fb447485e900485bc1d8e2834d80ae0bfdb7f",
+    "source_mtime_ns": 1770291035933052000,
+    "destination_sha256": "f88c8f2b522f8204a1761b04931fb447485e900485bc1d8e2834d80ae0bfdb7f",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/envs/minecraft.py",
+    "destination": "baselines/dreamerv3/envs/minecraft.py",
+    "source_sha256": "a38f0f9149a606c02df025e3b7908e6b134f5fd9b7ce88643f5f55da8b8e5d88",
+    "source_mtime_ns": 1770202210350234000,
+    "destination_sha256": "a38f0f9149a606c02df025e3b7908e6b134f5fd9b7ce88643f5f55da8b8e5d88",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/envs/minecraft_base.py",
+    "destination": "baselines/dreamerv3/envs/minecraft_base.py",
+    "source_sha256": "61b71febf71beb3bf11e8978a3d04913be56388d8803a65e064f6b9a0a27246e",
+    "source_mtime_ns": 1770202210351250000,
+    "destination_sha256": "61b71febf71beb3bf11e8978a3d04913be56388d8803a65e064f6b9a0a27246e",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/envs/minecraft_minerl.py",
+    "destination": "baselines/dreamerv3/envs/minecraft_minerl.py",
+    "source_sha256": "99f28ef5c5844fe1d86a8c954589c1e0e49166a82d2086f870411a63a4f5cc4a",
+    "source_mtime_ns": 1770202210353235000,
+    "destination_sha256": "99f28ef5c5844fe1d86a8c954589c1e0e49166a82d2086f870411a63a4f5cc4a",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/envs/wrappers.py",
+    "destination": "baselines/dreamerv3/envs/wrappers.py",
+    "source_sha256": "7073225392506bda80f5d2b1af17b086f18d300f1da360af2abb40aed63e2676",
+    "source_mtime_ns": 1770202210369237000,
+    "destination_sha256": "7073225392506bda80f5d2b1af17b086f18d300f1da360af2abb40aed63e2676",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/er_training/dreamer_sequential_er.py",
+    "destination": "baselines/dreamerv3/er_training/dreamer_sequential_er.py",
+    "source_sha256": "6282ce28f677b29d7ff8a372d47bf158db2380efcb7811f335444e008e6337f4",
+    "source_mtime_ns": 1777222757724144000,
+    "destination_sha256": "6282ce28f677b29d7ff8a372d47bf158db2380efcb7811f335444e008e6337f4",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/ewc_training/dreamer_sequential_ewc.py",
+    "destination": "baselines/dreamerv3/ewc_training/dreamer_sequential_ewc.py",
+    "source_sha256": "b4052cbb4619ef2d85e757b81f58c617beb74c4757df81fc448fa3508c908a9c",
+    "source_mtime_ns": 1777222760985678000,
+    "destination_sha256": "b4052cbb4619ef2d85e757b81f58c617beb74c4757df81fc448fa3508c908a9c",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/ewc_training/ewc.py",
+    "destination": "baselines/dreamerv3/ewc_training/ewc.py",
+    "source_sha256": "ae363a7b9fd247f1c9e73ef2831d61dc280cdf9f67fa6df91c65cceec123b688",
+    "source_mtime_ns": 1774965681815275000,
+    "destination_sha256": "ae363a7b9fd247f1c9e73ef2831d61dc280cdf9f67fa6df91c65cceec123b688",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/exploration.py",
+    "destination": "baselines/dreamerv3/exploration.py",
+    "source_sha256": "5f90034258150338a801fe87df9e9a3c37cefc8c7e6c5aeaf9671ad77f34db62",
+    "source_mtime_ns": 1774877435277613000,
+    "destination_sha256": "5f90034258150338a801fe87df9e9a3c37cefc8c7e6c5aeaf9671ad77f34db62",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/models.py",
+    "destination": "baselines/dreamerv3/models.py",
+    "source_sha256": "0e8fb9eed99569e3e730edce212d3048c92d929933d2c45478698efac1035cc6",
+    "source_mtime_ns": 1775841718640018000,
+    "destination_sha256": "0e8fb9eed99569e3e730edce212d3048c92d929933d2c45478698efac1035cc6",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/networks.py",
+    "destination": "baselines/dreamerv3/networks.py",
+    "source_sha256": "3faf53d7a400dde3d991a4e2608f1a7d41cdb38d616325ad8557d76ce65b79c1",
+    "source_mtime_ns": 1774864297067147000,
+    "destination_sha256": "3faf53d7a400dde3d991a4e2608f1a7d41cdb38d616325ad8557d76ce65b79c1",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/packnet_training/dreamer_sequential_packnet.py",
+    "destination": "baselines/dreamerv3/packnet_training/dreamer_sequential_packnet.py",
+    "source_sha256": "9ef9a2cbe956121aeb11885f1efc00434a2680e5bc89a991ebe65107fd195323",
+    "source_mtime_ns": 1777222763486766000,
+    "destination_sha256": "9ef9a2cbe956121aeb11885f1efc00434a2680e5bc89a991ebe65107fd195323",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/packnet_training/packnet.py",
+    "destination": "baselines/dreamerv3/packnet_training/packnet.py",
+    "source_sha256": "24c6e004c46cee45e2a0469402fc70799b646cf0a77d0a4fd263a5ccf9f8e1ee",
+    "source_mtime_ns": 1775838962979249000,
+    "destination_sha256": "24c6e004c46cee45e2a0469402fc70799b646cf0a77d0a4fd263a5ccf9f8e1ee",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/parallel.py",
+    "destination": "baselines/dreamerv3/parallel.py",
+    "source_sha256": "af567681772f0cd6a6a12a69735f2c212d3cf0cad7f4d58b0375e64bfe6e6643",
+    "source_mtime_ns": 1773167996471444000,
+    "destination_sha256": "af567681772f0cd6a6a12a69735f2c212d3cf0cad7f4d58b0375e64bfe6e6643",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/sweep/job_to_env.py",
+    "destination": "baselines/dreamerv3/sweep/job_to_env.py",
+    "source_sha256": "f6b9d15d97ecec5af2fb7f44577c6189f02cc7fb33e4f094887be3e2d3424bae",
+    "source_mtime_ns": 1777226406127581000,
+    "destination_sha256": "f6b9d15d97ecec5af2fb7f44577c6189f02cc7fb33e4f094887be3e2d3424bae",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/sweep/launch_sequential.sh",
+    "destination": "baselines/dreamerv3/sweep/launch_sequential.sh",
+    "source_sha256": "2c30d3131d01c09cc7beb7e7cc73c7849996f5351807f48fc24418f192137323",
+    "source_mtime_ns": 1784594154319691816,
+    "destination_sha256": "3238166867f533c17b4f2c25a92acf0899a398bc5fd3ea528fb31eb4e984424b",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/sweep/launch_single.sh",
+    "destination": "baselines/dreamerv3/sweep/launch_single.sh",
+    "source_sha256": "52ac3c9fb78e63748f4b1801165e96fc3710b104ce411b3927ac4170e2617585",
+    "source_mtime_ns": 1777223069410851000,
+    "destination_sha256": "52ac3c9fb78e63748f4b1801165e96fc3710b104ce411b3927ac4170e2617585",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/sweep/launch_sweep.py",
+    "destination": "baselines/dreamerv3/sweep/launch_sweep.py",
+    "source_sha256": "87b958cff6f94a772472681f7b9b877ac01cbd7b6ac6ab6b31de150d4cddce22",
+    "source_mtime_ns": 1784594081206561350,
+    "destination_sha256": "e5158f46a066d5571d086285263e7fed48b199112c7cfbefbec37b850e37b908",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/sweep/run_array.sbatch",
+    "destination": "baselines/dreamerv3/sweep/run_array.sbatch",
+    "source_sha256": "d6ee0ed6a36c6d3087c4a6787fbd101bced347790f9b55ad18e6c045d1bf4a6e",
+    "source_mtime_ns": 1784711831098627032,
+    "destination_sha256": "7c88ab1e029980c02c687372cff4e91d952e1ab0fab9f6d3432f1444b4f1a511",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/sweep/sweep_sequential.yaml",
+    "destination": "baselines/dreamerv3/sweep/sweep_sequential.yaml",
+    "source_sha256": "81c870bf13f146e126ecf5a989497114468908054ab146212a34b4163cc24795",
+    "source_mtime_ns": 1777735389330863000,
+    "destination_sha256": "93338d866123179a1b93ad3543bbd662ae9d88fc311becfde01434f8ef3d862d",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/sweep/sweep_sequential_er.yaml",
+    "destination": "baselines/dreamerv3/sweep/sweep_sequential_er.yaml",
+    "source_sha256": "260f47997d92e81a13595c6ccc1a2d73d1465eb4563449ac78947a122902a886",
+    "source_mtime_ns": 1780565890562215555,
+    "destination_sha256": "1859234b6741c870e9aa996ad7f08b698c7b953fc811dae02b1f8b4f91bf206d",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/sweep/sweep_sequential_ewc.yaml",
+    "destination": "baselines/dreamerv3/sweep/sweep_sequential_ewc.yaml",
+    "source_sha256": "25b750c52961ee8b174dabe1271975dc7fe356e3215880ec344286e79d373375",
+    "source_mtime_ns": 1780565909705498204,
+    "destination_sha256": "f34b52452d0ec9cf3739cee4d5b884b5f5bd0b599571a072c3723af505337d8a",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/sweep/sweep_sequential_packnet.yaml",
+    "destination": "baselines/dreamerv3/sweep/sweep_sequential_packnet.yaml",
+    "source_sha256": "8f9ac3d5a152f3d7f367935d1404e13071c4958f53b4237cd799636a6e77a483",
+    "source_mtime_ns": 1779899604029601000,
+    "destination_sha256": "78ac9628896952a2e77ce377c53fbb78a169b7a3637a2e36f5c098c26d82f601",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/sweep/sweep_sequential_regular.yaml",
+    "destination": "baselines/dreamerv3/sweep/sweep_sequential_regular.yaml",
+    "source_sha256": "c4d5468cb2f48da70ecb1362e29a205dfeeaa59c67d23d75796906f08c4f1f65",
+    "source_mtime_ns": 1784965953106787478,
+    "destination_sha256": "fdfc10e54a2ee2e499523eda7f2fd9a2244fd95655f302c40542cdad1ab59261",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/sweep/sweep_single.yaml",
+    "destination": "baselines/dreamerv3/sweep/sweep_single.yaml",
+    "source_sha256": "2b7bfdb5ca22c162f17853331c8ca7182b6d530913ef4ee3c5170f6183f7189c",
+    "source_mtime_ns": 1779897580815584000,
+    "destination_sha256": "07f199fc4e13f20be100a6198c59a43fb9c9a806152839eb8fabdee3d60f971d",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/tools.py",
+    "destination": "baselines/dreamerv3/tools.py",
+    "source_sha256": "379d5ad1f9ff5d2ff749f8c3983d32a23fcee3db9d53348a5beb4f0b3e2faa22",
+    "source_mtime_ns": 1777226198556535000,
+    "destination_sha256": "379d5ad1f9ff5d2ff749f8c3983d32a23fcee3db9d53348a5beb4f0b3e2faa22",
+    "adapted": false
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_binpnp.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_binpnp.sh",
+    "source_sha256": "01a294bd8b9639220f4618d28bbbf43a35e2480c6509c6d182175b7797c8177c",
+    "source_mtime_ns": 1776857199549911000,
+    "destination_sha256": "4de293c85bdc5b1b6d6bdd33a208bd787ba9c7efc338732709184a6f54e3edce",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_binpnp_er.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_binpnp_er.sh",
+    "source_sha256": "27bb17baebc6adc1729989ceb74330d6831986c9ffdd8af67484fe18ddde2b65",
+    "source_mtime_ns": 1776768878542310000,
+    "destination_sha256": "1a8c18cda5cd3ea1cacca8862c3a5b3791faafb99f459a4096212c9ccb2c9a5a",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_binpnp_ewc.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_binpnp_ewc.sh",
+    "source_sha256": "3078ab6cf8b459e6a37571d6cc88c30c16a1ee0cdf07f5c4fc0b686b95c7cee4",
+    "source_mtime_ns": 1776714946447633000,
+    "destination_sha256": "0b2899016576415532e68638b42f76c257c143b4a3d2186e77c7c366b14dfdad",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_binpnp_packnet.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_binpnp_packnet.sh",
+    "source_sha256": "2730a901d800543b1465df2f23426e9c98b53f036b5f4f487a0706492c0bcd45",
+    "source_mtime_ns": 1775841791518235000,
+    "destination_sha256": "ac2d3cf67dc1f42979f6ab3cc008798f56cf2327c768fad804bc90d2cc3bd878",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_binpnp_regular.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_binpnp_regular.sh",
+    "source_sha256": "174b0fc85097293c63c0512d0ad145b3dfa8727878c85bd3b0f5ed67b17d8074",
+    "source_mtime_ns": 1776857261647119000,
+    "destination_sha256": "c15ea9ab8fb43254d35b2a2e3e75f45497ea7687cf41b84d307f13dbafa532bb",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_drawerpnp.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_drawerpnp.sh",
+    "source_sha256": "5c415f6a800add18dd7337f83335cea47274a347615f553833f828ac9578ddc3",
+    "source_mtime_ns": 1776097391058492000,
+    "destination_sha256": "9e91898a4f8c775484bae4d3fed1384dd3ba2f939eb74024e72f012c731ef3be",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_drawerpnp_er.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_drawerpnp_er.sh",
+    "source_sha256": "b28c12f4e9286e4421cf7b8fa5c938b9eb6caca4ac1ba56df57872ae6579e6fe",
+    "source_mtime_ns": 1775573139296401000,
+    "destination_sha256": "79bba792fcfbb5348707598555918f25f661c797dbba835a25d0052646e2c2bc",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_drawerpnp_ewc.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_drawerpnp_ewc.sh",
+    "source_sha256": "6e2f1bab811df372b1f58b3b5522f3d983a09682dbe9dfa1f15f33eab725d3d3",
+    "source_mtime_ns": 1776099104407080000,
+    "destination_sha256": "be41dba5c53a7f460287f282b964b56f0fd3b0edc5f20e9d3b543a4c430dcce9",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_drawerpnp_mini.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_drawerpnp_mini.sh",
+    "source_sha256": "d0f822bb07d3fb719884be57b6f95d46d127c28b28040763f6e8c3e8b780e4d1",
+    "source_mtime_ns": 1775422586099762000,
+    "destination_sha256": "e8fb9703b3650806b607c6692a5cda270cede8b25067efcdb2fa3ee22ede2a46",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_drawerpnp_packnet.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_drawerpnp_packnet.sh",
+    "source_sha256": "9289e0f68c0b498f816933ddc4d2b0826bfa8abc9e20c7769971cea40a2dd33b",
+    "source_mtime_ns": 1776171715161245000,
+    "destination_sha256": "ff5f733db7935f37755493d86f720dca369a5dd5dd4a6bd1f1706ce99e4cfbd0",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_grasp.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_grasp.sh",
+    "source_sha256": "fc5fde44cd4cd199b313f343bd9fd428dfdd6fde1a0d7f520f577aaeec4f82d6",
+    "source_mtime_ns": 1775422586109756000,
+    "destination_sha256": "df365221053f038d39b4b887fce8ed90d003725722ae891f90409226dbe70b25",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_grasp_er.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_grasp_er.sh",
+    "source_sha256": "fcd73db8d409329892fc499670bc4983a16a7bd7aa4dc27adbdcbafef457f0c0",
+    "source_mtime_ns": 1775422586115763000,
+    "destination_sha256": "fa40134f7e41f8fb2d377f6f8b50952cd404bff02d03c884b1d0210b243927b1",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_grasp_ewc.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_grasp_ewc.sh",
+    "source_sha256": "e96ba3cd038c50c489326b3e669666256b3366b7a38535cf0a4f7de9debfe9da",
+    "source_mtime_ns": 1775852939900364000,
+    "destination_sha256": "a84d9013c112e132f6fd8160b4abf9ce28ca3755b38aa264de06b81653948ff8",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_grasp_packnet.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_grasp_packnet.sh",
+    "source_sha256": "893cf95eb3e2c7f2a6eecabc4dccbd21146f6fc31ec0bdb3f248a5fee6fa6d97",
+    "source_mtime_ns": 1776370663766488000,
+    "destination_sha256": "935e973b29799113a89e8bc17f70a6814b31f3fdf4e5b31ff5acbab4dbd65a7e",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_pnpblock.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_pnpblock.sh",
+    "source_sha256": "bffa9aae010dd7cd6ee9277a6f8431f74d1c54fc4a20d50c1183992222c06061",
+    "source_mtime_ns": 1776097523794195000,
+    "destination_sha256": "968e4ad6a37b62c25022f9389ab7c94145b60b759f9b2b3c22dc488712e76a3e",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_pnpblock_er.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_pnpblock_er.sh",
+    "source_sha256": "d4a0fd8ae24e77e3a75dd5814dfad9dba58353a15f436c4b16179c12c31b39d4",
+    "source_mtime_ns": 1775754552001870000,
+    "destination_sha256": "715d44987034979fd3f6d58da16886ba92c76536bf5f0d232cea8da61e8c0cc2",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_pnpblock_ewc.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_pnpblock_ewc.sh",
+    "source_sha256": "653fe10e03d32edfd51af7d2624c7d4c07d9329099d116e3845c6d052381d010",
+    "source_mtime_ns": 1776280272494713000,
+    "destination_sha256": "561023a27227236d9cb6e429bbf7ec41808eda0a1ef4b7a179f9cece6881019a",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_pnpblock_packnet.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_pnpblock_packnet.sh",
+    "source_sha256": "5055cd897f306ea355e841cc4f9d4287fd3792611ab01459bb72e5f14ac2bb7f",
+    "source_mtime_ns": 1776099436113062000,
+    "destination_sha256": "da3e766ff7029e815dd755e8f5e2b875df9d74dd4cd113380f1d816b3b99090b",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_pnpboxclose.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_pnpboxclose.sh",
+    "source_sha256": "7c81630623b66f8fc816c42629cef4c63fa339aaa9db65bba58d4920c1325033",
+    "source_mtime_ns": 1778624072339072000,
+    "destination_sha256": "2d40872ed01134b8dd97ed025e3841a48e88dd3059c828cb1f50b2aa23efeaf2",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_pnpboxclose_er.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_pnpboxclose_er.sh",
+    "source_sha256": "413e791c4a56ac93b3a8d5938d6c280f666e82ee8bcb71a7648dd071e681a8bf",
+    "source_mtime_ns": 1777403273777539000,
+    "destination_sha256": "ae4b43d648e4281410cd43aa5169c66be48ff01b1ac7568f955e0466f4685961",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_pnpboxclose_ewc.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_pnpboxclose_ewc.sh",
+    "source_sha256": "f7482034d89d755ed83bd38c22e9148bac35e9fecf1fe38ccea058b3380de113",
+    "source_mtime_ns": 1776099221042543000,
+    "destination_sha256": "c138ed7ce713fd68515d3a157040072d72986c66cfe01d7f89b961822e14b5bc",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_pnpboxclose_packnet.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_pnpboxclose_packnet.sh",
+    "source_sha256": "d0af38a5b3ff6a1bbf26bc9c7621fd4fbb2167722d2bbb82febeb5c5de9afb81",
+    "source_mtime_ns": 1776101380977240000,
+    "destination_sha256": "439bcffa0daa7c0494acd97dea27b73d4e6b7d912554971348ba08fd741ace00",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_reach.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_reach.sh",
+    "source_sha256": "d2f67c030af1e86e5b0318c6ae039cfa6e9a93cc6e30e84782402bcec5d2c078",
+    "source_mtime_ns": 1776767707645298000,
+    "destination_sha256": "33f4cbb631f019b944df03d26830dd05bd22616e4e1c86bcf3d60fee3a2bbfa3",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_reach_er.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_reach_er.sh",
+    "source_sha256": "c4d82b75c5ee37d5079eb32c0054cf34ed573b51ebeb3a81393fccc2970763ac",
+    "source_mtime_ns": 1776768490675948000,
+    "destination_sha256": "75603877080a61bcf9e0da5e20653dfa99ecbd775bba25a4a7fdbf6205352096",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_reach_ewc.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_reach_ewc.sh",
+    "source_sha256": "f7c93bf4ddc02c59229307f83157ebcff0639d66f336b973a1db480c3374c4fd",
+    "source_mtime_ns": 1776774930171983000,
+    "destination_sha256": "b4b60102ee70a52b129570a61721daa354f257762518c505670acf2213f0f95a",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/sequential_train_reach_packnet.sh",
+    "destination": "baselines/dreamerv3/training/sequential_train_reach_packnet.sh",
+    "source_sha256": "1ecae9f6193edb0186f5b4c81cf934f7f6170bb7035206681f5d058d48fc1921",
+    "source_mtime_ns": 1776769470209953000,
+    "destination_sha256": "30abd2d938a6bfe41e0366ce33572e5ed1d76c56a45ea0b472f96b7dbee1ecae",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/single_train_binpnp.sh",
+    "destination": "baselines/dreamerv3/training/single_train_binpnp.sh",
+    "source_sha256": "c830cc7f821110d0999d91cbcd9982a647c3cca2b9ea381369e3dac8d1b5f1cd",
+    "source_mtime_ns": 1775723016133459000,
+    "destination_sha256": "bb2abfcbee468447f9cd4c8fb5a960f7e15a363c96fec2b264c1f4e7be238c2e",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/single_train_box.sh",
+    "destination": "baselines/dreamerv3/training/single_train_box.sh",
+    "source_sha256": "192d43ad51c615205e35d045e2bdb46b45746898290886262369be7add19eb87",
+    "source_mtime_ns": 1775422586407726000,
+    "destination_sha256": "b02d5b049ba9c6d02c7b40a4b45267c8e41be302138076b6cb4cf04c005e21ec",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/single_train_compo_pnpblock.sh",
+    "destination": "baselines/dreamerv3/training/single_train_compo_pnpblock.sh",
+    "source_sha256": "ebfcb413a69a98935c17c5ba5809704a2152f5449be4eb8ed159f790b87c0728",
+    "source_mtime_ns": 1776028502765099000,
+    "destination_sha256": "e156d28ded0309eb6f19cba774e4fc95c6ed20ebde57901c90fc15db3b486376",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/single_train_compo_pnpboxclose.sh",
+    "destination": "baselines/dreamerv3/training/single_train_compo_pnpboxclose.sh",
+    "source_sha256": "7d2fcf1e15b0a67ee8770318f698a13762982776dd60dade3c526c8065338a3e",
+    "source_mtime_ns": 1778605016795506000,
+    "destination_sha256": "8346783a02aa67b986c8c682f6abe36f5a4f459b7fc22c95aeabb5644fa4bb94",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/single_train_drawer.sh",
+    "destination": "baselines/dreamerv3/training/single_train_drawer.sh",
+    "source_sha256": "63bb39454062f9159076d189c512369bf788a973913f993f49485b0982411309",
+    "source_mtime_ns": 1775422586418717000,
+    "destination_sha256": "f3aca50d40fef7805053cad82b3f3290dfeb05a77a637ccad4e3de2018e192d5",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/single_train_drawerpnp.sh",
+    "destination": "baselines/dreamerv3/training/single_train_drawerpnp.sh",
+    "source_sha256": "d2ff354b9e42d7d75fa03e579fd17de172232586612cb89195268e22a4e6cab0",
+    "source_mtime_ns": 1776810725191269000,
+    "destination_sha256": "4ec07bc1178bd85624da2c656d42e9087132dcbe0ef2e0531091dca59e5dde27",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/single_train_grasp.sh",
+    "destination": "baselines/dreamerv3/training/single_train_grasp.sh",
+    "source_sha256": "e8f7cab2b458980cef54a2d89060dbfc328c0176a30c54a7ac65d3cf2d363755",
+    "source_mtime_ns": 1775574933086584000,
+    "destination_sha256": "91caf8094928a759620f9327e226d0858d2d105083c26e0767459e6f97abd9f4",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/single_train_pnp.sh",
+    "destination": "baselines/dreamerv3/training/single_train_pnp.sh",
+    "source_sha256": "3023bc4d8ff7972e9ed08da4937777e6558eb83e87d75579bbc5dcd39b48aae7",
+    "source_mtime_ns": 1775553678603031000,
+    "destination_sha256": "d6148cda4f14ce3fc69bc55471c107b9f95d101f4b25c977cc9acef1308782e7",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/single_train_pnpblock.sh",
+    "destination": "baselines/dreamerv3/training/single_train_pnpblock.sh",
+    "source_sha256": "8f83c9533d762619f29e2fb45e86a00614886f9b79e12a2b71d48892dcb50450",
+    "source_mtime_ns": 1776028466060340000,
+    "destination_sha256": "ca3a511d006ce4d4af37bc0e1abec9b691c590e5287cc3bf892d9ce98bad57e6",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/single_train_reach.sh",
+    "destination": "baselines/dreamerv3/training/single_train_reach.sh",
+    "source_sha256": "7e8a40eb78d4e7a613351e01df4f9063b5e7ed44a1e53d2566045a2b8dc8a935",
+    "source_mtime_ns": 1776937057961767000,
+    "destination_sha256": "f5c2edcc0e8be647b9d1760d76adb66fbb5e497d6113f80a8b899a6d99cf8571",
+    "adapted": true
+  },
+  {
+    "source": "<source-tdmpc2-dreamer>/third_party/dreamerv3/training/single_train_reach_xy.sh",
+    "destination": "baselines/dreamerv3/training/single_train_reach_xy.sh",
+    "source_sha256": "251ecd7ae597367e6cbf983ecb42f171d2b959cca2b1112276d3e84c1e693a54",
+    "source_mtime_ns": 1776014993993274000,
+    "destination_sha256": "6b4f9ab75a531979c75baae75788341e75b3b14300774330b8ba4b46337e026f",
+    "adapted": true
+  }
+]

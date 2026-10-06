@@ -1,0 +1,149 @@
+# Training configuration; paths are relative to the project root.
+sweep_id: prismatic_seq_progressive_01
+seeds:
+- 0
+- 1
+- 2
+logdir_root: baselines/pwm/sweep/logdir
+naming:
+  run_name: '{taskset}_seed{seed}'
+  wandb_group: '{taskset}'
+  wandb_tags:
+  - '{method}'
+  - '{taskset}'
+  - seed{seed}
+  - '{date}'
+  - '{sweep_id}'
+  logdir_folder: '{taskset}/seed_{seed}'
+defaults:
+  image_size: 128
+  max_episode_steps: 250
+  action_repeat: 2
+  cameras:
+  - topview
+  - front
+  - gripperPOV
+  batch_size: 256
+  horizon: 3
+  mpc: true
+  eval_freq: 5000
+  eval_episodes: 5
+  episodic: true
+  model_size: 19
+  save_freq: 50000
+tasksets:
+  binpnp:
+    tasks:
+    - metaworld_bin-picking-redblue-v3
+    - metaworld_bin-picking-yellowblue-v3
+    - metaworld_bin-picking-redpurple-v3
+    - metaworld_bin-picking-yellowpurple-v3
+  drawerpnp:
+    tasks:
+    - metaworld_drawer-open-v3
+    - metaworld_pick-place-v3
+    - metaworld_compo-draweropen-pickplace
+  pnpblock:
+    tasks:
+    - metaworld_pick-place-redblock-v3
+    - metaworld_pick-place-greenblock-v3
+    - metaworld_compo-pickplace-block
+  reach:
+    tasks:
+    - metaworld_reach-xy-v3
+    - metaworld_reach-xz-v3
+    - metaworld_reach-yz-v3
+    - metaworld_reach-xyz-v3
+  grasp:
+    tasks:
+    - metaworld_reach-v3
+    - metaworld_grasp-v3
+    - metaworld_pick-place-v3
+  pnpboxclose:
+    tasks:
+    - metaworld_pick-place-redblock-v3
+    - metaworld_box-close-v3
+    - metaworld_compo-pickplace-boxclose
+methods:
+  prismatic_seq_progressive:
+    entry: sequential/sequential_train_progressive.py
+    wandb_project: prismatic_seq_progressive
+    logdir_subdir: prismatic_seq_progressive
+    extra_args:
+    - --save-episodes
+    - --prune-every-n-episodes
+    - '5'
+    - --sdp-freeze
+    tasksets:
+      binpnp:
+        steps:
+        - 800000
+        - 800000
+        - 800000
+        - 800000
+        buffer_sizes:
+        - 180000
+        - 180000
+        - 180000
+        - 180000
+      drawerpnp:
+        steps:
+        - 100000
+        - 500000
+        - 1800000
+        buffer_sizes:
+        - 25000
+        - 125000
+        - 180000
+      pnpblock:
+        steps:
+        - 800000
+        - 800000
+        - 1800000
+        buffer_sizes:
+        - 200000
+        - 200000
+        - 180000
+      reach:
+        steps:
+        - 200000
+        - 200000
+        - 200000
+        - 200000
+        buffer_sizes:
+        - 50000
+        - 50000
+        - 50000
+        - 50000
+      grasp:
+        steps:
+        - 200000
+        - 600000
+        - 500000
+        buffer_sizes:
+        - 50000
+        - 150000
+        - 125000
+      pnpboxclose:
+        steps:
+        - 800000
+        - 600000
+        - 1800000
+        buffer_sizes:
+        - 180000
+        - 150000
+        - 180000
+encoder:
+  checkpoint: checkpoints/encoder_ms19.pt
+  variants:
+  - scratch
+  - pretrained
+matrix:
+- method: prismatic_seq_progressive
+  tasksets:
+  - binpnp
+  - drawerpnp
+  - pnpblock
+  - reach
+  - grasp
+  - pnpboxclose

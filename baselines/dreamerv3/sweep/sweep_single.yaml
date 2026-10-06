@@ -1,0 +1,138 @@
+# Training configuration; paths are relative to the project root.
+sweep_id: sweep_single_01
+seeds:
+- 0
+- 1
+- 2
+logdir_root: baselines/dreamerv3/sweep/logdir
+naming:
+  run_name: '{method}_{taskset}_seed{seed}'
+  wandb_group: '{method}_{taskset}'
+  wandb_tags:
+  - '{method}'
+  - '{taskset}'
+  - seed{seed}
+  - '{date}'
+  - '{sweep_id}'
+  logdir_folder: '{taskset}/seed_{seed}'
+tasksets:
+  binpnp:
+    tasks:
+    - metaworld_bin-picking-yellowpurple-v3
+  boxclose:
+    tasks:
+    - metaworld_box-close-v3
+  draweropen:
+    tasks:
+    - metaworld_drawer-open-v3
+  graspcube:
+    tasks:
+    - metaworld_grasp-v3
+  pnpblock:
+    tasks:
+    - metaworld_pick-place-redblock-v3
+  pnpcube:
+    tasks:
+    - metaworld_pick-place-v3
+  reach_xy:
+    tasks:
+    - metaworld_reach-xy-v3
+  reach_xyz:
+    tasks:
+    - metaworld_reach-xyz-v3
+  compo_drawerpnp:
+    tasks:
+    - metaworld_compo-draweropen-pickplace
+  compo_pnpblock:
+    tasks:
+    - metaworld_compo-pickplace-block
+  compo_pnpboxclose:
+    tasks:
+    - metaworld_compo-pickplace-boxclose
+methods:
+  regular:
+    entry: dreamer_sequential.py
+    wandb_project: Metaworld_Dreamerv3_Single
+    logdir_subdir: single
+    extra_args: []
+    tasksets:
+      binpnp:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 700000
+        dataset_sizes_divisor: 8
+      boxclose:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 500000
+        dataset_sizes_divisor: 8
+      draweropen:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 200000
+        dataset_sizes_divisor: 8
+      graspcube:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 500000
+        dataset_sizes_divisor: 8
+      pnpblock:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 800000
+        dataset_sizes_divisor: 8
+      pnpcube:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 600000
+        dataset_sizes_divisor: 8
+      reach_xy:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 400000
+        dataset_sizes_divisor: 8
+      reach_xyz:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 1400000
+        dataset_sizes_divisor: 8
+      compo_drawerpnp:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 1500000
+        dataset_sizes_divisor: 8
+      compo_pnpblock:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 1800000
+        dataset_sizes_divisor: 8
+      compo_pnpboxclose:
+        configs:
+        - metaworld_visual_200M_heavy_long_speedup
+        steps:
+        - 1500000
+        dataset_sizes_divisor: 8
+matrix:
+- method: regular
+  tasksets:
+  - binpnp
+  - boxclose
+  - draweropen
+  - graspcube
+  - pnpblock
+  - pnpcube
+  - reach_xy
+  - reach_xyz
+  - compo_drawerpnp
+  - compo_pnpblock
+  - compo_pnpboxclose

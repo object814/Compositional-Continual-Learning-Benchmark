@@ -1,0 +1,122 @@
+# Training configuration; paths are relative to the project root.
+sweep_id: tdmpc2_single_01
+seeds:
+- 0
+- 1
+- 2
+logdir_root: baselines/tdmpc2/sweep/logdir
+naming:
+  run_name: '{method}_{taskset}_seed{seed}'
+  wandb_group: '{method}_{taskset}'
+  wandb_tags:
+  - '{method}'
+  - '{taskset}'
+  - seed{seed}
+  - '{date}'
+  - '{sweep_id}'
+  logdir_folder: '{taskset}/seed_{seed}'
+defaults:
+  image_size: 128
+  max_episode_steps: 250
+  action_repeat: 2
+  cameras: '[topview,front,gripperPOV]'
+  batch_size: 256
+  horizon: 3
+  mpc: true
+  eval_freq: 10000
+  eval_episodes: 5
+  episodic: true
+  save_episodes: true
+  prune_every_n_episodes: 5
+  buffer_storage_device: auto
+tasksets:
+  binpnp:
+    task: metaworld_bin-picking-yellowpurple-v3
+    steps: 800000
+    buffer_size: 180000
+    model_size: 19
+    save_freq: 10000
+  boxclose:
+    task: metaworld_box-close-v3
+    steps: 600000
+    buffer_size: 150000
+    model_size: 19
+    save_freq: 10000
+  draweropen:
+    task: metaworld_drawer-open-v3
+    steps: 200000
+    buffer_size: 50000
+    model_size: 19
+    save_freq: 10000
+  graspcube:
+    task: metaworld_grasp-v3
+    steps: 600000
+    buffer_size: 150000
+    model_size: 19
+    save_freq: 10000
+  pnpblock:
+    task: metaworld_pick-place-redblock-v3
+    steps: 800000
+    buffer_size: 180000
+    model_size: 19
+    save_freq: 10000
+  pnpcube:
+    task: metaworld_pick-place-v3
+    steps: 500000
+    buffer_size: 125000
+    model_size: 19
+    save_freq: 10000
+  reach_xy:
+    task: metaworld_reach-xy-v3
+    steps: 200000
+    buffer_size: 50000
+    model_size: 19
+    save_freq: 10000
+  reach_xyz:
+    task: metaworld_reach-xyz-v3
+    steps: 200000
+    buffer_size: 50000
+    model_size: 19
+    save_freq: 10000
+  compo_drawerpnp:
+    task: metaworld_compo-draweropen-pickplace
+    steps: 1500000
+    buffer_size: 180000
+    model_size: 19
+    save_freq: 20000
+  compo_pnpblock:
+    task: metaworld_compo-pickplace-block
+    steps: 1500000
+    buffer_size: 180000
+    model_size: 19
+    save_freq: 20000
+  compo_pnpboxclose:
+    task: metaworld_compo-pickplace-boxclose
+    steps: 1500000
+    buffer_size: 180000
+    model_size: 19
+    save_freq: 20000
+methods:
+  regular:
+    entry: tdmpc2/train.py
+    wandb_project: Metaworld_Tdmpc2_Single
+    logdir_subdir: single
+encoder:
+  checkpoint: checkpoints/encoder_ms19.pt
+  variants:
+  - scratch
+  - pretrained
+matrix:
+- method: regular
+  tasksets:
+  - binpnp
+  - boxclose
+  - draweropen
+  - graspcube
+  - pnpblock
+  - pnpcube
+  - reach_xy
+  - reach_xyz
+  - compo_drawerpnp
+  - compo_pnpblock
+  - compo_pnpboxclose

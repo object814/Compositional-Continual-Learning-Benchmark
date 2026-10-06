@@ -1,0 +1,18 @@
+# Meta-World expert baseline returns
+# best of 10 scripted-policy rollouts, terminated on success, max 500 steps/episode
+# reward tuned per step as (r-1)/2 (RewardTuningWrapperV2 defaults, RL-training reward)
+# return = sum of tuned per-timestep rewards (negative)
+task                 env_name                        best_return  success
+pnp                  pick-place-v3                      -19.3030  True
+reachxy              reach-xy-v3                         -7.8945  True
+reachxz              reach-xz-v3                         -6.0930  True
+reachyz              reach-yz-v3                         -2.8060  True
+reachxyz             reach-xyz-v3                        -3.2035  True
+binpnp               bin-picking-v3                     -49.8155  True
+boxclose             box-close-v3                       -66.6990  True
+draweropen           drawer-open-v3                     -38.0005  True
+grasp                grasp-v3                           -12.8380  True
+pnpblock             pick-place-block-v3                -29.7895  True
+compopnpblock        compo-pickplace-block              -90.4435  True
+compopnpboxclose     compo-pickplace-boxclose          -135.8420  True
+compodopnp           compo-draweropen-pickplace        -103.3890  True
