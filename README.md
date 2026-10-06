@@ -75,10 +75,12 @@ cd Compositional-Continual-Learning-Benchmark
 
    Inside the container you are a user with your host name and IDs and
    passwordless `sudo`, the repository is at `/workspace`, and files you
-   write there, such as logs, belong to you in your checkout. Commands in the
-   rest of this guide run unchanged inside this shell. Leave the shell with
-   `exit`; the container is then removed. A container started elsewhere can be
-   stopped with `docker ps` and `docker stop <container>`.
+   write there, such as logs, belong to you in your checkout. Your W&B
+   settings in `.env` are passed in automatically (see
+   [Weights & Biases](#weights--biases)). Commands in the rest of this guide
+   run unchanged inside this shell. Leave the shell with `exit`; the
+   container is then removed. A container started elsewhere can be stopped
+   with `docker ps` and `docker stop <container>`.
 
 ## Pretrained encoder
 
@@ -93,6 +95,36 @@ cp /path/to/encoder_ms19.pt checkpoints/
 
 Runs that need the checkpoint stop before starting if it is missing. Runs
 with encoders trained from scratch do not need it.
+
+## Weights & Biases
+
+Training logs metrics to [Weights & Biases](https://wandb.ai) (W&B). Put your
+settings in a `.env` file at the repository root; it is never committed:
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env`:
+
+| Setting | Meaning | Options |
+| --- | --- | --- |
+| `WANDB_API_KEY` | Your W&B API key. Required for online logging. | Copy it from <https://wandb.ai/authorize>. |
+| `WANDB_ENTITY` | The W&B account or team that runs are logged under. | Leave it commented out to use your personal account, or set a team name. Overridden by `--wandb-entity TEAM` on the launcher. |
+| `WANDB_MODE` | Where metrics go. | `online` (default when unset): upload to wandb.ai. `offline`: save only in each run's log directory; upload later with `wandb sync <run directory>/wandb/offline-run-*`. `disabled`: no W&B logging. |
+
+Only `WANDB_API_KEY` is needed for the usual setup; leave the other two
+commented out unless you need them.
+
+- **Docker:** `docker/run.sh` passes `.env` into the container automatically.
+- **Conda:** load `.env` into your shell before training:
+
+  ```bash
+  set -a; source .env; set +a
+  ```
+
+  Alternatively, run `wandb login` once, which stores the API key on your
+  machine.
 
 ## Verify the installation
 
@@ -109,7 +141,8 @@ with encoders trained from scratch do not need it.
 
 2. Optionally, run short end-to-end smoke tests. `--smoke` trains each
    selected run for 3,000 steps per task with seed 0, logs to `smoke_logs/`,
-   and keeps W&B offline. One command per method and encoder variant:
+   and logs W&B offline unless `WANDB_MODE` is set. One command per method
+   and encoder variant:
 
    ```bash
    python scripts/launch.py tdmpc2 sweep_sequential_regular.yaml --smoke --taskset grasp
@@ -178,11 +211,9 @@ A successful run creates `done.flag` there; rerunning a command with
 `--rerun-failed` skips finished runs. Each training script keeps its own
 checkpointing and resume behaviour when an interrupted run is relaunched.
 
-Metrics are logged to Weights & Biases under your default account. Run
-`wandb login` once in the conda environment; with Docker, run it in the
-container shell before training. Pass `--wandb-entity TEAM` to log to a team
-instead. The launcher stores each run's W&B ID in
-its log directory so a resumed run continues the same W&B run.
+Metrics go to W&B as configured in [Weights & Biases](#weights--biases). The
+launcher stores each run's W&B ID in its log directory, so a resumed run
+continues the same W&B run.
 
 ## Tasks and curricula
 
