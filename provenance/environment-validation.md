@@ -27,6 +27,12 @@ Fixes made during validation, none in the training code:
   `hydra-submitit-launcher` (selected by the TD-MPC2/PWM `config.yaml`) and
   `tensorboard` (imported by DreamerV3).
 
+The Docker image installs `requirements.txt` with pip on `python:3.10-slim`
+(Debian 12) rather than conda. A first image based on Miniforge (Ubuntu 20.04)
+failed to import tensordict: its compiled extension needs a newer system
+C++ runtime (`libstdc++`) than Ubuntu 20.04 provides. The cluster
+environment used AlmaLinux 9's newer runtime.
+
 Results may differ slightly from the original runs because DreamerV3 moved
 from MuJoCo 2.3.5 to 3.1.2, the torch/torchrl/tensordict nightlies became
 stable releases, and PWM single-task runs uncompiled.

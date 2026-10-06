@@ -16,7 +16,8 @@ pretrained, frozen encoder.
 ## Requirements
 
 - Linux (x86_64) with an NVIDIA GPU and a driver that supports CUDA 12.4
-- Either conda (Miniforge, Miniconda or Anaconda) or Docker with the
+- Either conda (Miniforge, Miniconda or Anaconda) or Docker (no conda
+  needed) with the
   [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/)
 
 All baselines render MuJoCo scenes offscreen with OSMesa, on the CPU.
@@ -63,9 +64,10 @@ cd Compositional-Continual-Learning-Benchmark
 Do not run the helper with `sudo`: you would be root inside the container and
 the files you create would belong to root.
 
-1. Build the image. It contains only the environment; the repository is
-   mounted when the container starts, so code changes need no rebuild.
-   Rebuild after changes to `environment.yml`, `requirements.txt`,
+1. Build the image. It contains Python 3.10 and the packages in
+   `requirements.txt` (the same versions as the conda environment), but not
+   the code: the repository is mounted when the container starts, so code
+   changes need no rebuild. Rebuild after changes to `requirements.txt`,
    `Dockerfile` or `docker/entrypoint.sh`. The first build downloads several
    GB.
 
@@ -93,8 +95,8 @@ the files you create would belong to root.
 
    The first call starts a container named `cclb-<your user name>` in the
    background; later calls open new shells in the same container. Inside it
-   the environment is active (the shell prompt starts with `(/opt/cclb)`),
-   you are a user with your host name and IDs and passwordless `sudo`, the
+   `python` already has every package installed, you are a user with your
+   host name and IDs and passwordless `sudo`, the
    repository is at `/workspace`, and files you write there, such as logs and
    checkpoints, are the same files as in your checkout. Commands in the rest
    of this guide run unchanged inside this shell.

@@ -1,5 +1,4 @@
 # The image holds only the environment; code, logs and checkpoints are mounted.
 *
-!environment.yml
 !requirements.txt
 !docker/entrypoint.sh
