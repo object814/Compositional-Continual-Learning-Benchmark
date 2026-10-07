@@ -13,7 +13,7 @@ multirun/
 *.pt
 *.pth
 
-# Local tool state (in-repo conda env, Warp kernel and pip caches)
+# Local tool state (conda envs, Warp kernel and other caches, see mjwenv/workspace.py)
 .conda/
 .cache/
 .env

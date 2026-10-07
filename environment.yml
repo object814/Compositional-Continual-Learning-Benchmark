@@ -1,9 +1,8 @@
-# Conda environment for all baselines, created inside the repository (.conda/env)
-# with the download caches there too, so nothing is written to the home directory:
-#   CONDA_PKGS_DIRS=$PWD/.conda/pkgs PIP_CACHE_DIR=$PWD/.cache/pip PYTHONNOUSERSITE=1 \
-#       conda env create -p ./.conda/env -f environment.yml
-#   conda activate ./.conda/env
-name: cclb-warp
+# Conda environment for all baselines (MuJoCo-Warp version):
+#   PYTHONNOUSERSITE=1 conda env create -f environment.yml
+#   conda activate cclb-mujoco-warp
+# To put it in a chosen directory, use `-p <dir>/cclb-mujoco-warp` in both commands.
+name: cclb-mujoco-warp
 channels:
   - conda-forge
 dependencies:
