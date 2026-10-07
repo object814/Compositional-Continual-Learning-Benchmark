@@ -1,7 +1,7 @@
 # Conda environment for all baselines:
 #   PYTHONNOUSERSITE=1 conda env create -f environment.yml
-#   conda activate cclb
-name: cclb
+#   conda activate cclb-warp
+name: cclb-warp
 channels:
   - conda-forge
 dependencies:
