@@ -83,7 +83,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(BASE_DIR))
 import metaworld
-from metaworld.wrappers import ProprioImageObsWrapper, ProprioMultiImageObsWrapper
+from mjwenv import MetaWorldWarpEnv
 
 # PackNet (paper-faithful: prune weights only, freeze bias/norm)
 from packnet import PackNetManager
@@ -339,15 +339,10 @@ def make_dataset(episodes, config):
 def make_env(task_name, config, mode, id):
     suite, task = task_name.split("_", 1)
     if suite == "metaworld":
-        env = gymnasium.make(
-            "Meta-World/MT1", env_name=task, render_mode="rgb_array",
-            max_episode_steps=config.time_limit,
-        )
-        env = ProprioMultiImageObsWrapper(
-            env,
-            image_height=config.size[0],
-            image_width=config.size[1],
-            camera_names=["topview", "front", "gripperPOV"],
+        # MuJoCo-Warp: one GPU-simulated world behind the CPU env's interface
+        env = MetaWorldWarpEnv(
+            task, image_size=config.size[0], max_episode_steps=config.time_limit,
+            cameras=["topview", "front", "gripperPOV"],
         )
         env = metaworld_wrappers.FirstTerminalObs(env)
         env = metaworld_wrappers.RewardTuningWrapperV2(env)
@@ -543,6 +538,7 @@ def build_task_config(task_name, config_name, task_steps, configs_yaml, remainin
     config.eval_every //= config.action_repeat
     config.log_every //= config.action_repeat
     config.time_limit //= config.action_repeat
+    config.parallel = False  # MuJoCo-Warp envs step in this process, on the GPU
 
     return config
 

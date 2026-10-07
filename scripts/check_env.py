@@ -3,7 +3,8 @@
 
 Reports package versions, tests the GPU, imports every training entry point
 (by running it with --help, exactly as the launcher would invoke it), and
-builds, resets, renders and steps each benchmark task. Writes no files.
+builds, resets, renders and steps each benchmark task with MuJoCo-Warp. The
+first run compiles the GPU kernels into .cache/warp, which takes a few minutes.
 
     python scripts/check_env.py               # everything
     python scripts/check_env.py --quick       # three tasks only
@@ -22,7 +23,8 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 
-PACKAGES = ['torch', 'torchvision', 'tensordict', 'torchrl', 'numpy', 'mujoco', 'gymnasium', 'gym',
+PACKAGES = ['torch', 'torchvision', 'tensordict', 'torchrl', 'numpy', 'mujoco', 'mujoco_warp', 'warp',
+            'gymnasium', 'gym',
             'OpenGL', 'cv2', 'scipy', 'hydra', 'hydra_plugins.hydra_submitit_launcher', 'submitit',
             'omegaconf', 'ruamel.yaml', 'yaml', 'termcolor', 'wandb', 'tensorboard',
             'moviepy', 'imageio', 'cloudpickle', 'psutil', 'PIL', 'pandas', 'matplotlib', 'tqdm']
@@ -104,20 +106,16 @@ def check_entry_points(timeout):
 
 
 def task_worker(tasks):
-    """Runs in a subprocess so MUJOCO_GL is set before MuJoCo is imported."""
-    import gymnasium
+    """Runs in a subprocess, so a crash in one task is reported instead of ending the check."""
     import numpy as np
     sys.path.insert(0, str(ROOT))
-    import metaworld  # noqa: F401  # registers Meta-World/MT1
-    from metaworld.wrappers import ProprioMultiImageObsWrapper
+    from mjwenv import MetaWorldWarpEnv
 
     results = []
     for task in tasks:
         start = time.time()
         try:
-            env = gymnasium.make('Meta-World/MT1', env_name=task, render_mode='rgb_array', max_episode_steps=500)
-            env = ProprioMultiImageObsWrapper(env, image_height=128, image_width=128,
-                                              camera_names=['topview', 'front', 'gripperPOV'])
+            env = MetaWorldWarpEnv(task, image_size=128, max_episode_steps=500)
             obs, _ = env.reset(seed=0)
             for _ in range(5):
                 obs, reward, *_ = env.step(env.action_space.sample())
@@ -132,11 +130,10 @@ def task_worker(tasks):
     print('RESULTS ' + json.dumps(results))
 
 
-def check_tasks(tasks, backend, timeout):
-    print(f'Benchmark tasks (MUJOCO_GL={backend})', flush=True)
-    env = {**os.environ, 'MUJOCO_GL': backend, 'PYOPENGL_PLATFORM': backend}
+def check_tasks(tasks, timeout):
+    print('Benchmark tasks (MuJoCo-Warp)', flush=True)
     try:
-        proc = subprocess.run([sys.executable, __file__, '--worker', ','.join(tasks)], cwd=ROOT, env=env,
+        proc = subprocess.run([sys.executable, __file__, '--worker', ','.join(tasks)], cwd=ROOT,
                               capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         return report(False, 'tasks', f'timed out after {timeout}s')
@@ -155,7 +152,6 @@ def main(argv=None):
     parser.add_argument('--quick', action='store_true', help='Check three tasks instead of all 18.')
     parser.add_argument('--skip-tasks', action='store_true', help='Skip building the benchmark tasks.')
     parser.add_argument('--skip-gpu', action='store_true', help='Skip the CUDA check (e.g. on a login node).')
-    parser.add_argument('--egl', action='store_true', help='Also test EGL rendering (the baselines use OSMesa).')
     parser.add_argument('--timeout', type=int, default=1800, help='Seconds allowed per subprocess.')
     parser.add_argument('--worker', help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
@@ -169,9 +165,7 @@ def main(argv=None):
         results['gpu'] = check_gpu()
     results['entry points'] = check_entry_points(args.timeout)
     if not args.skip_tasks:
-        tasks = QUICK_TASKS if args.quick else TASKS
-        for backend in ['osmesa'] + (['egl'] if args.egl else []):
-            results[f'tasks ({backend})'] = check_tasks(tasks, backend, args.timeout)
+        results['tasks'] = check_tasks(QUICK_TASKS if args.quick else TASKS, args.timeout)
 
     print('\nSummary', flush=True)
     for name, passed in results.items():

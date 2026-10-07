@@ -32,7 +32,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(BASE_DIR))
 import metaworld
-from metaworld.wrappers import ProprioImageObsWrapper, ProprioMultiImageObsWrapper
+from mjwenv import MetaWorldWarpEnv
 
 
 to_np = lambda x: x.detach().cpu().numpy()
@@ -218,17 +218,10 @@ def make_dataset(episodes, config):
 def make_env(config, mode, id):
     suite, task = config.task.split("_", 1)
     if suite == "metaworld":
-        env = gymnasium.make(
-            "Meta-World/MT1",
-            env_name=task,
-            render_mode="rgb_array",
-            max_episode_steps=config.time_limit,
-        )
-        env = ProprioMultiImageObsWrapper(
-            env,
-            image_height=config.size[0],
-            image_width=config.size[1],
-            camera_names=["topview", "front", "gripperPOV"],
+        # MuJoCo-Warp: one GPU-simulated world behind the CPU env's interface
+        env = MetaWorldWarpEnv(
+            task, image_size=config.size[0], max_episode_steps=config.time_limit,
+            cameras=["topview", "front", "gripperPOV"],
         )
         env = metaworld_wrappers.FirstTerminalObs(env)
         env = metaworld_wrappers.RewardTuningWrapperV2(env)
@@ -390,6 +383,7 @@ def load_checkpoint(agent, logdir, load_optimizers=True, device=None):
 # ===========================================================================
 
 def main(config):
+    config.parallel = False  # MuJoCo-Warp envs step in this process, on the GPU
     tools.set_seed_everywhere(config.seed)
     if config.deterministic_run:
         tools.enable_deterministic_run()

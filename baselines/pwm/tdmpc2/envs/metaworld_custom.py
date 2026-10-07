@@ -4,8 +4,9 @@ Custom Metaworld environment maker for TD-MPC2.
 Mirrors the DreamerV3 `make_env` pipeline in
 `baselines/dreamerv3/dreamer_sequential.py`:
 
-  gymnasium.make("Meta-World/MT1", env_name=task)
-    -> ProprioMultiImageObsWrapper (topview + front + gripperPOV stacked, 128x128)
+  MetaWorldWarpEnv (MuJoCo-Warp on the GPU; same interface as
+    gymnasium.make("Meta-World/MT1") + ProprioMultiImageObsWrapper,
+    topview + front + gripperPOV stacked, 128x128)
     -> RewardTuningWrapperV2 ((-1,1) -> (-1,0))
         -> _Gymnasium5To4 (classic gym-style 4-tuple API for TD-MPC2 compatibility)
     -> _DictObsAdapter (rename keys to 'state'/'rgb', CHW layout)
@@ -26,14 +27,13 @@ import numpy as np
 from envs.wrappers.timeout import Timeout
 from envs.wrappers.action_repeat import ActionRepeat
 
-# Make sure the Metaworld repo root is on sys.path so that we can import
-# `metaworld` and `metaworld.wrappers` regardless of the working directory.
+# Make sure the repo root is on sys.path so that we can import `mjwenv`
+# regardless of the working directory.
 _BASE_DIR = Path(__file__).resolve().parents[4]
 if str(_BASE_DIR) not in sys.path:
     sys.path.insert(0, str(_BASE_DIR))
 
-import metaworld  # noqa: F401  # registers the "Meta-World/MT1" entry
-from metaworld.wrappers import ProprioMultiImageObsWrapper
+from mjwenv import MetaWorldWarpEnv
 
 
 
@@ -193,17 +193,8 @@ def make_env(cfg):
     # action-repeat factor so that timeouts fire at the intended env-step count.
     inner_max_steps = max_episode_steps * action_repeat
 
-    env = gymnasium.make(
-        "Meta-World/MT1",
-        env_name=env_name,
-        render_mode="rgb_array",
-        max_episode_steps=inner_max_steps,
-    )
-    env = ProprioMultiImageObsWrapper(
-        env,
-        image_height=image_size,
-        image_width=image_size,
-        camera_names=cameras,
+    env = MetaWorldWarpEnv(
+        env_name, image_size=image_size, cameras=cameras, max_episode_steps=inner_max_steps,
     )
     env = RewardTuningWrapperV2(
         env,

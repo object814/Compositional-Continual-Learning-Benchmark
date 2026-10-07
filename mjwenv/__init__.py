@@ -4,12 +4,9 @@
 environment's gymnasium interface. `make_batched_env` gives the underlying
 batched environment (many worlds per call).
 """
-import os
-from pathlib import Path
+from .workspace import use_workspace_caches
 
-# Keep Warp's compiled-kernel cache in the repository (.cache/warp) rather than
-# the home directory; set WARP_CACHE_PATH to put it elsewhere.
-os.environ.setdefault("WARP_CACHE_PATH", str(Path(__file__).resolve().parents[1] / ".cache" / "warp"))
+use_workspace_caches()   # caches go to <repo>/.cache, not the home directory
 
 from .batched_env import BatchedSawyerEnv  # noqa: E402
 from .gym_env import MetaWorldWarpEnv  # noqa: E402

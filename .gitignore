@@ -20,3 +20,6 @@ multirun/
 .vscode/
 .idea/
 *.sif
+
+# CPU-vs-warp comparison runs (local only)
+validation/
