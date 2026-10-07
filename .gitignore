@@ -13,7 +13,8 @@ multirun/
 *.pt
 *.pth
 
-# Local tool state
+# Local tool state (in-repo conda env, Warp kernel and pip caches)
+.conda/
 .cache/
 .env
 .vscode/
