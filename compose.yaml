@@ -5,7 +5,7 @@
 services:
   cclb:
     build: .
-    image: cclb
+    image: cclb-warp
     init: true
     shm_size: 16g
     # Run as the host user so files written to the repository belong to them.

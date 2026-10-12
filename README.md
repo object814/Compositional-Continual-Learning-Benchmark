@@ -1,4 +1,14 @@
-# Compositional Continual Learning Benchmark
+# Compositional Continual Learning Benchmark: MuJoCo-Warp version
+
+This branch (`mujoco-warp`) runs the benchmark with
+[MuJoCo-Warp](https://github.com/google-deepmind/mujoco_warp): every task is
+simulated and rendered on the GPU instead of the CPU, so training is faster.
+Tasks, baselines, hyperparameters and commands are the same as on `main`.
+
+**Use `main` to reproduce the paper.** This version follows the paper's tasks
+step for step, but GPU physics (float32) and the GPU renderer make training
+dynamics differ slightly from the published results (see
+[Speed and consistency](#speed-and-consistency)).
 
 Meta-World manipulation tasks arranged into curricula, where later tasks
 compose skills from earlier ones, with three model-based baselines:
@@ -19,6 +29,7 @@ Requires Linux with an NVIDIA GPU (driver supporting CUDA 12.4).
 ```bash
 git clone https://github.com/object814/Compositional-Continual-Learning-Benchmark.git
 cd Compositional-Continual-Learning-Benchmark
+git checkout mujoco-warp
 cp .env.example .env        # then set WANDB_API_KEY (or WANDB_MODE=offline)
 ```
 
@@ -27,11 +38,16 @@ Then set up **either** conda **or** Docker.
 ### Option A: conda
 
 ```bash
-sudo apt-get install -y libosmesa6 libgl1 libegl1 libglib2.0-0   # or: sudo dnf install -y mesa-libOSMesa
-PYTHONNOUSERSITE=1 conda env create -f environment.yml
-conda activate cclb
-set -a; source .env; set +a                                      # load W&B settings
+PYTHONNOUSERSITE=1 conda env create -f environment.yml      # creates cclb-mujoco-warp
+conda activate cclb-mujoco-warp
+set -a; source .env; set +a                                   # load W&B settings
 ```
+
+To create the environment in a directory of your choice, use
+`-p <dir>/cclb-mujoco-warp` in both commands. If `python` still points to
+another installation after `conda activate` (`type -a python` shows it), check
+that conda's own `bin` directory is not placed ahead of the environment on
+your `PATH`.
 
 ### Option B: Docker
 
@@ -53,12 +69,12 @@ docker compose down               # stop and remove it
 Or with plain Docker:
 
 ```bash
-docker build -t cclb .
-docker run -d --init --name cclb --gpus all --shm-size 16g \
-    --user "$(id -u):$(id -g)" --env-file .env -v "$PWD":/workspace cclb
-docker exec -it cclb bash
-docker stop cclb                  # `docker start cclb` resumes it
-docker rm -f cclb
+docker build -t cclb-warp .
+docker run -d --init --name cclb-warp --gpus all --shm-size 16g \
+    --user "$(id -u):$(id -g)" --env-file .env -v "$PWD":/workspace cclb-warp
+docker exec -it cclb-warp bash
+docker stop cclb-warp             # `docker start cclb-warp` resumes it
+docker rm -f cclb-warp
 ```
 
 Rebuild only after changing `requirements.txt` or `Dockerfile`. To keep
@@ -76,6 +92,13 @@ which is distributed separately:
 mkdir -p checkpoints && cp /path/to/encoder_ms19.pt checkpoints/
 ```
 
+### Caches
+
+The first run compiles the GPU kernels, which takes a few minutes; they are
+cached afterwards. This and every other cache the code writes (Warp,
+`torch.compile`, W&B, ...) go to `.cache/` in the repository, not to your home
+directory.
+
 ## Verify the installation
 
 ```bash
@@ -88,15 +111,24 @@ benchmark tasks. `--smoke` trains for 3,000 steps per task and keeps no
 output. With several GPUs, select one first, for example
 `export CUDA_VISIBLE_DEVICES=1`.
 
+Two optional checks of the GPU simulation itself:
+
+```bash
+python scripts/check_warp_parity.py   # compare every task with the CPU version, step by step
+python scripts/bench_warp.py          # time construction, reset and step of the GPU tasks
+```
+
 ## Repository layout
 
 ```
 baselines/tdmpc2/      TD-MPC2: code (tdmpc2/) and sweep configurations (sweep/)
 baselines/pwm/         PWM: code, sweep configurations, expert-reuse analysis
 baselines/dreamerv3/   DreamerV3: code and sweep configurations
-metaworld/             benchmark environments and assets
+metaworld/             benchmark environments (CPU reference) and assets
+mjwenv/                the same tasks on MuJoCo-Warp (GPU), used for training
 scripts/launch.py      runs a sweep configuration
 scripts/check_env.py   installation check
+scripts/check_warp_parity.py, scripts/bench_warp.py   GPU-simulation checks
 ```
 
 Each experiment is a YAML file in `baselines/<baseline>/sweep/`.
@@ -149,6 +181,35 @@ Curricula (`--taskset`), trained in order:
 | `pnpblock` | pick-place-redblock → pick-place-greenblock → compo-pickplace-block |
 | `pnpboxclose` | pick-place-redblock → box-close → compo-pickplace-boxclose |
 
+## Speed and consistency
+
+Measured against `main` with the same tasks, seeds and settings, the two
+versions running side by side on the same GPU:
+
+| | Training speed-up |
+| --- | --- |
+| TD-MPC2 | about 2.7× |
+| DreamerV3 | about 1.3× (most of its time is spent on gradient updates) |
+
+**What is the same as `main`:** task layouts, resets, observations, rewards,
+success tests, episode length, and every training script, wrapper and
+hyperparameter. Given the same simulator state, the GPU tasks return the same
+observations (to about 1e-6), the same success flags and the same rewards (to
+about 0.002) as the CPU tasks. TD-MPC2 (reach-xy, drawer-open, grasp) and
+DreamerV3 (drawer-open) learned at the same rate on both versions, within
+seed-to-seed variation.
+
+**What differs slightly:**
+
+- Physics runs in float32 on the GPU (MuJoCo 3.14 with MuJoCo-Warp), with
+  MuJoCo 3.1.2's collision settings. Contact-rich motion therefore drifts
+  slowly away from the CPU version over long rollouts.
+- Images come from a GPU ray tracer: the same scene and cameras, but slightly
+  different lighting and shading, with no reflections. Policies trained on
+  one version are not expected to transfer to the other without retraining.
+- DreamerV3 steps its environments in its own process instead of in worker
+  processes.
+
 ## License
 
 MIT (see `LICENSE`). Code adapted from other projects keeps its original
@@ -158,9 +219,11 @@ license.
 
 The environments in `metaworld/` are built upon
 [Meta-World](https://github.com/Farama-Foundation/Metaworld) (MIT license in
-`metaworld/LICENSE`). The baselines are adapted from TD-MPC2, PWM and
-DreamerV3; their licenses are in `baselines/<baseline>/LICENSE`. If you use
-the environments, please also cite Meta-World:
+`metaworld/LICENSE`), and `mjwenv/` re-implements them on
+[MuJoCo-Warp](https://github.com/google-deepmind/mujoco_warp). The baselines
+are adapted from TD-MPC2, PWM and DreamerV3; their licenses are in
+`baselines/<baseline>/LICENSE`. If you use the environments, please also cite
+Meta-World:
 
 ```bibtex
 @inproceedings{mclean2025metaworld,
