@@ -16,6 +16,7 @@ import tempfile
 
 import yaml
 
+import wandb_restart
 from sweep_config import (
     _is_sequential_schema, apply_filters, apply_pretrained_encoder,
     expand_dreamer_jobs, expand_jobs, expand_sequential_jobs, parse_filters,
@@ -147,23 +148,10 @@ def expand_encoder_variants(args, cfg, jobs):
     return expanded
 
 
-def without_episode_saving(args):
-    """Drop --save-episodes and --prune-every-n-episodes N from a sequential job's extra arguments."""
-    kept, skip = [], False
-    for arg in args:
-        if skip:
-            skip = False
-        elif arg == '--prune-every-n-episodes':
-            skip = True
-        elif arg != '--save-episodes':
-            kept.append(arg)
-    return kept
-
-
 def apply_smoke(baseline, jobs, steps):
     """Shrink budgets so warm-up, updates, evaluation and task switches each run briefly, and save as
     little as possible: no replay episodes, videos or periodic checkpoints. Files a method needs while
-    running, such as end-of-task models or DreamerV3's episode dataset, are still written."""
+    running, such as end-of-task models, are still written."""
     every = max(steps // 3, 1)
     for job in jobs:
         n = len(job.get('tasks', [None]))
@@ -179,9 +167,15 @@ def apply_smoke(baseline, jobs, steps):
                        save_episodes=False)
             job['extra_args'] = extra + ['save_video=false', 'save_agent=false']
         else:
-            job.update(task_steps=[steps] * n, task_buffer_sizes=[steps] * n,
-                       eval_freq=every, eval_episodes=1, save_freq=0)
-            job['extra_args'] = without_episode_saving(extra) + ['--no-save-episodes', '--no-save-video']
+            job.update(task_steps=[steps] * n, task_buffer_sizes=[steps] * n, eval_freq=every, eval_episodes=1)
+            if job.get('save_freq') is not None:
+                job['save_freq'] = 0
+            job['extra_args'] = extra + ['--no-save-video']
+
+
+def is_sequential(baseline, job):
+    """Sequential training scripts (all DreamerV3 runs use one, single-task ones included)."""
+    return baseline == 'dreamerv3' or job['mode'] == 'sequential'
 
 
 def check_checkpoints(jobs):
@@ -223,21 +217,22 @@ def build_command(baseline, job, python='python', run_id=None):
         cmd += ['hydra.run.dir=' + job['logdir'], 'hydra.job.chdir=false']
     else:
         flags = {'tasks': job['tasks'], 'logdir': job['logdir'], 'seed': job['seed'],
-                 'wandb-project': job['wandb_project'], 'wandb-run-name': job['run_name']}
+                 'wandb-project': job['wandb_project'], 'wandb-run-name': job['run_name'],
+                 'wandb-group': job['wandb_group'], 'wandb-tags': job['wandb_tags']}
         if job.get('wandb_entity'):
             flags['wandb-entity'] = job['wandb_entity']
         if run_id:
             flags['wandb-run-id'] = run_id
         if baseline == 'dreamerv3':
             flags.update(configs=job['configs'], **{
-                'task-steps': job['steps'], 'dataset-sizes': job['dataset_sizes'],
-                'wandb-group': job['wandb_group'], 'wandb-tags': job['wandb_tags']})
+                'task-steps': job['steps'], 'dataset-sizes': job['dataset_sizes']})
         else:
             flags.update({'task-steps': job['task_steps'], 'task-buffer-sizes': job['task_buffer_sizes'],
                           'logger': 'wandb', 'exp-name': job['run_name']})
             for key in ('model_size', 'batch_size', 'horizon', 'eval_freq', 'eval_episodes',
                         'save_freq', 'image_size', 'max_episode_steps', 'action_repeat', 'cameras'):
-                flags[key.replace('_', '-')] = job[key]
+                if job.get(key) is not None:                     # save_freq: PWM only
+                    flags[key.replace('_', '-')] = job[key]
         for key, val in flags.items():
             cmd.append('--' + key)
             if isinstance(val, list):
@@ -282,7 +277,13 @@ def main(argv=None):
                 shutil.rmtree(logdir, ignore_errors=True)  # smoke runs always start fresh
             logdir.mkdir(parents=True, exist_ok=True)
             id_file = logdir / 'wandb_run_id.txt'
-            run_id = (id_file.read_text().strip() if id_file.exists() else '') or secrets.token_hex(4)
+            run_id = id_file.read_text().strip() if id_file.exists() else ''
+            if (run_id and is_sequential(args.baseline, job) and not args.smoke
+                    and not (logdir / 'done.flag').exists()):
+                # Started again after an interruption: training resumes at the first unfinished
+                # task, and W&B continues in a new run holding the completed tasks' history.
+                run_id = wandb_restart.restart(job, run_id, logdir)
+            run_id = run_id or secrets.token_hex(4)
             id_file.write_text(run_id + '\n')
         cmd = build_command(args.baseline, job, run_id=run_id)
         prefix = pythonpath(args.baseline)

@@ -8,7 +8,6 @@ without needing a GPU.
 """
 
 import sys
-import tempfile
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
@@ -94,31 +93,6 @@ def main():
                   f'step {step:,}{" (end)" if at_end else ""}')
     check('every reached run is causal-eligible', n_causal == len(reached),
           f'{n_causal}/{len(reached)}')
-
-    print('\ntrainer mid-task snapshot finder')
-    from sequential.sequential_train import find_task_snapshot
-    r = next(x for x in reached if not x.is_finished())
-    snap = find_task_snapshot(r.task_dirs[r.final_task_idx])
-    check('finds a snapshot for an unfinished task', snap is not None)
-    if snap:
-        step, bb, tm = snap
-        check('snapshot files exist and share a directory',
-              bb.exists() and tm.exists() and bb.parent == tm.parent,
-              f'{r.name} @ {step:,}')
-        check('agrees with the analysis-side discovery',
-              step == r.latest_checkpoint_pair(r.final_task_idx)[2])
-
-    with tempfile.TemporaryDirectory() as td:
-        check('returns None when there is no models/ dir',
-              find_task_snapshot(td) is None)
-        m = Path(td) / 'models' / '1000'
-        m.mkdir(parents=True)
-        (m / 'backbone.pt').write_bytes(b'x')
-        check('skips a snapshot missing task_modules.pt',
-              find_task_snapshot(td) is None)
-        (m / 'task_modules.pt').write_bytes(b'x')
-        check('accepts it once both files are present',
-              find_task_snapshot(td)[0] == 1000)
 
     print()
     if FAILED:

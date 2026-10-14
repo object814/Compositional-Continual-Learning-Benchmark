@@ -18,19 +18,18 @@ Cross-task evaluation builds a throw-away "eval shell" for each previous
 task `j`: a fresh TDMPC2 whose encoder/dynamics are rebound to the live
 backbone and whose heads are loaded from `task{j+1}_*/task_modules.pt`.
 
-Checkpoint layout per task:
+Checkpoint layout per task, written when the task ends:
     <logdir>/task{N}_<task>/
         backbone.pt            -- encoder + dynamics weights + Adam moments
         task_modules.pt        -- reward / Qs / termination / pi / scale +
                                   head-slice Adam moments + pi_optim state
-        models/{step}.pt       -- periodic whole-agent snapshots (if save_freq > 0)
         eval_video/            -- TD-MPC2 video recorder output
 
-Checkpoint layout per task:
-    <logdir>/task{N}_<task>/
-        models/final.pt        -- final agent state dict for the task
-        models/{step}.pt       -- periodic snapshots (if save_freq > 0)
-        eval_video/            -- TD-MPC2 video recorder output
+Resume works at task boundaries: `<logdir>/sequential_progress.json` marks a
+task completed once its files are written. Running the same command again
+skips completed tasks and starts the first unfinished one from its beginning:
+its folder from the interrupted attempt is deleted, and the task is seeded as
+in an uninterrupted run (see `begin_task`).
 
 Example:
     python sequential_train.py \\
@@ -137,7 +136,14 @@ def save_progress(base_logdir, task_idx, completed=False,
         entry["completed"] = True
     if global_step_at_end is not None:
         entry["global_step_at_end"] = int(global_step_at_end)
-    path.write_text(json.dumps(prog, indent=2))
+    _write_json_atomic(path, prog)
+
+
+def _write_json_atomic(path, obj):
+    """Write via a temporary file, so a job killed mid-write leaves the old file intact."""
+    tmp = path.with_name(path.name + '.tmp')
+    tmp.write_text(json.dumps(obj, indent=2))
+    tmp.replace(path)
 
 
 def load_progress(base_logdir):
@@ -152,7 +158,27 @@ def save_wandb_run_id(base_logdir, run_id):
     path = _progress_file(base_logdir)
     prog = json.loads(path.read_text()) if path.exists() else {"tasks": {}}
     prog["wandb_run_id"] = run_id
-    path.write_text(json.dumps(prog, indent=2))
+    _write_json_atomic(path, prog)
+
+
+def task_seed(seed, task_idx):
+    """Seed of task `task_idx`; task 0 uses the run seed itself."""
+    return int(seed) + 10_000 * int(task_idx)
+
+
+def begin_task(base_logdir, task_idx, task_name, seed):
+    """Start task `task_idx` from its beginning: delete what an interrupted
+    attempt left in its folder and reseed. A resumed run then trains this task
+    as an uninterrupted run would (up to GPU non-determinism). Returns the
+    (empty) task folder."""
+    task_dir = Path(base_logdir) / f'task{task_idx + 1}_{task_name}'
+    if task_dir.exists():
+        print(colored(f'>>> Deleting the unfinished attempt at task '
+                      f'{task_idx + 1}: {task_dir}', 'yellow'))
+        shutil.rmtree(task_dir)
+    task_dir.mkdir(parents=True)
+    set_seed(task_seed(seed, task_idx))
+    return task_dir
 
 
 # ==========================================================================
@@ -176,9 +202,6 @@ class SequentialLogger:
         self._task_idx = task_idx
         self._num_tasks = num_tasks
         self._task_name = task_name
-        self._work_dir = Path(cfg.work_dir)
-        self._model_dir = self._work_dir / 'models'
-        self._model_dir.mkdir(parents=True, exist_ok=True)
         self._wandb = wandb_run
         self.global_step_fn = lambda s: s  # overwritten by trainer per task
         if save_video and wandb_run is not None:
@@ -191,10 +214,6 @@ class SequentialLogger:
     @property
     def video(self):
         return self._video
-
-    @property
-    def model_dir(self):
-        return self._model_dir
 
     def log_train(self, d):
         """Log per-episode training metrics under a single continuous
@@ -248,27 +267,6 @@ class SequentialLogger:
             f'R={r:.2f} S={s:.2f}  @g={gstep}'
         )
 
-    def save_agent(self, agent=None, identifier='final'):
-        if agent is None:
-            return
-        fp = self._model_dir / f'{identifier}.pt'
-        # Keep only the most recent ckpt on disk; previous periodic snapshots
-        # were never used (CL resume runs from backbone.pt + task_modules.pt
-        # at task boundaries, not from models/<step>.pt).
-        for existing in self._model_dir.glob('*.pt'):
-            if existing.name != fp.name:
-                try:
-                    existing.unlink()
-                except OSError:
-                    pass
-        agent.save(fp)
-
-    def finish(self, agent=None):
-        if agent is not None:
-            try:
-                self.save_agent(agent, identifier='final')
-            except Exception as e:
-                print(colored(f'Save failed: {e}', 'red'))
 
 class _PrefixedVideoRecorder(VideoRecorder):
     """VideoRecorder that writes under a caller-supplied per-eval prefix so
@@ -353,21 +351,13 @@ def _to_td(env, obs, action=None, reward=None, terminated=None):
 
 def train_one_task(cfg, agent, env, buffer, logger,
                    global_step_start, eval_fn, skip_pretrain,
-                   task_idx=0, num_tasks=1, task_name='',
-                   episode_dir=None, save_episodes=True,
-                   buffer_cap=None, prune_every_n_eps=5):
+                   task_idx=0, num_tasks=1, task_name=''):
     """Run TD-MPC2's online training loop for a single task.
 
     `eval_fn(agent, local_step, global_step)` runs the cross-task evaluation.
     Returns the final local step count.
-    `episode_dir` (when ``save_episodes=True``) is where each completed
-    episode is dumped; FIFO-pruned to ``buffer_cap`` transitions.
     """
     logger.global_step_fn = lambda s: global_step_start + s
-    if save_episodes and episode_dir is not None:
-        Path(episode_dir).mkdir(parents=True, exist_ok=True)
-    if buffer_cap is None:
-        buffer_cap = int(min(cfg.buffer_size, cfg.steps))
 
     pbar = tqdm(
         total=cfg.steps,
@@ -401,10 +391,6 @@ def train_one_task(cfg, agent, env, buffer, logger,
             if local_step % cfg.eval_freq == 0:
                 eval_next = True
 
-            if (cfg.save_freq > 0 and local_step > 0
-                    and local_step % cfg.save_freq == 0):
-                logger.save_agent(agent, identifier=local_step)
-
             if done:
                 if eval_next:
                     eval_fn(agent, local_step, global_step_start + local_step)
@@ -425,15 +411,7 @@ def train_one_task(cfg, agent, env, buffer, logger,
                     )
                     train_metrics.update(_common())
                     logger.log_train(train_metrics)
-                    ep_td = torch.cat(tds)
-                    ep_idx = buffer.add(ep_td)
-                    if save_episodes and episode_dir is not None:
-                        try:
-                            Buffer.save_episode(ep_td, episode_dir, ep_idx)
-                            if ep_idx % prune_every_n_eps == 0:
-                                Buffer.prune_episode_dir_to_cap(episode_dir, buffer_cap)
-                        except Exception as e:
-                            print(colored(f'[seq_train] save_episode failed: {e}', 'red'))
+                    ep_idx = buffer.add(torch.cat(tds))
 
                 obs = env.reset()
                 tds = [_to_td(env, obs)]
@@ -496,7 +474,6 @@ def main(args):
         mpc=args.mpc,
         eval_freq=args.eval_freq,
         eval_episodes=args.eval_episodes,
-        save_freq=args.save_freq,
         image_size=args.image_size,
         max_episode_steps=args.max_episode_steps,
         action_repeat=args.action_repeat,
@@ -504,14 +481,9 @@ def main(args):
         episodic=args.episodic,
         enable_wandb=False,  # we handle wandb ourselves
         save_video=args.save_video,
-        save_agent=True,
         exp_name=args.exp_name,
         compile=args.compile,
-        # Replay-buffer persistence + storage knobs (read by Buffer / trainer).
-        save_episodes=args.save_episodes,
-        episode_dir=None,                     # per-task dir is built inside the task loop
         buffer_storage_device=args.buffer_storage_device,
-        prune_every_n_episodes=args.prune_every_n_episodes,
         # Offline-pretrained encoder (loaded + optionally frozen inside
         # WorldModel.__init__). None is skipped by build_task_cfg, so the
         # cfg keeps its yaml default (fresh random encoder). When
@@ -588,6 +560,7 @@ def main(args):
             project=args.wandb_project,
             entity=args.wandb_entity,
             name=run_name,
+            group=args.wandb_group,
             id=effective_run_id,
             resume='allow' if effective_run_id else None,
             dir=str(base_logdir),
@@ -597,7 +570,8 @@ def main(args):
                 'seed': args.seed,
                 **shared,
             },
-            tags=['sequential', 'tdmpc2'] + list(args.tasks),
+            tags=(args.wandb_tags if args.wandb_tags is not None
+                  else ['sequential', 'tdmpc2'] + list(args.tasks)),
         )
         # Persist run id so a later interruption + restart can re-attach.
         try:
@@ -624,8 +598,7 @@ def main(args):
 
         cfg = task_cfgs[task_idx]
         task_name = args.tasks[task_idx]
-        task_logdir = Path(cfg.work_dir)
-        task_logdir.mkdir(parents=True, exist_ok=True)
+        task_logdir = begin_task(base_logdir, task_idx, task_name, args.seed)
 
         print('=' * 64)
         print(colored(
@@ -643,48 +616,9 @@ def main(args):
             global_step_at_start=global_step,
         )
 
-        # Buffer isolation: regular sequential training has no access to
-        # previous-task data, so delete every prior task's `train_eps/` dir
-        # the first time we enter that task. (Only previous tasks already
-        # marked completed get cleared — a partially-trained earlier task is
-        # protected so its resume path stays intact.)
-        for j in range(task_idx):
-            prev_done = (
-                progress is not None
-                and progress.get('tasks', {}).get(str(j), {}).get('completed')
-            )
-            if not prev_done:
-                continue
-            prev_eps = (
-                base_logdir / f'task{j + 1}_{args.tasks[j]}' / 'train_eps'
-            )
-            if prev_eps.is_dir():
-                print(colored(
-                    f'>>> Removing previous-task replay dir: {prev_eps}',
-                    'yellow'))
-                shutil.rmtree(prev_eps, ignore_errors=True)
-
-        # Fresh env + buffer for this task --------------------------------
+        # Fresh env + buffer for this task (no access to previous-task data) -
         train_env = make_env(cfg)
         buffer = Buffer(cfg)
-
-        # Per-task directory for persisted replay episodes.
-        task_episode_dir = task_logdir / 'train_eps'
-        task_buffer_cap = int(min(cfg.buffer_size, cfg.steps))
-        if args.save_episodes and task_episode_dir.is_dir():
-            stats = buffer.load_from_directory(
-                task_episode_dir, max_total_steps=task_buffer_cap)
-            if stats['episodes_restored'] > 0:
-                print(colored(
-                    f'>>> Replayed {stats["transitions_restored"]:,} transitions '
-                    f'from {stats["episodes_restored"]} episodes '
-                    f'(cap {task_buffer_cap:,}).',
-                    'green'))
-                if stats['kept_files']:
-                    dropped = Buffer.erase_over_episode_files(
-                        task_episode_dir, stats['kept_files'])
-                    if dropped:
-                        print(colored(f'>>> Pruned {dropped} stale episode files.', 'yellow'))
 
         logger = SequentialLogger(
             cfg, task_idx, num_tasks, task_name, wandb_run,
@@ -780,10 +714,6 @@ def main(args):
             task_idx=task_idx,
             num_tasks=num_tasks,
             task_name=task_name,
-            episode_dir=task_episode_dir,
-            save_episodes=args.save_episodes,
-            buffer_cap=task_buffer_cap,
-            prune_every_n_eps=args.prune_every_n_episodes,
         )
 
         # Save split checkpoint BEFORE the final cross-task eval so that
@@ -855,6 +785,8 @@ if __name__ == '__main__':
     p.add_argument('--wandb-run-name', type=str, default=None)
     p.add_argument('--wandb-run-id', type=str, default=None,
                    help="Existing wandb run id to resume with resume='allow'.")
+    p.add_argument('--wandb-group', type=str, default=None)
+    p.add_argument('--wandb-tags', nargs='*', default=None)
     p.add_argument('--exp-name', type=str, default='seq_tdmpc2')
     p.add_argument('--from-checkpoint', type=str, default=None,
                    help='Optional external checkpoint for task 1.')
@@ -876,7 +808,6 @@ if __name__ == '__main__':
     p.set_defaults(mpc=True)
     p.add_argument('--eval-freq', type=int, default=10000)
     p.add_argument('--eval-episodes', type=int, default=5)
-    p.add_argument('--save-freq', type=int, default=0)
     p.add_argument('--save-video', dest='save_video', action='store_true')
     p.add_argument('--no-save-video', dest='save_video', action='store_false')
     p.set_defaults(save_video=True)
@@ -895,15 +826,7 @@ if __name__ == '__main__':
     p.add_argument('--no-episodic', dest='episodic', action='store_false')
     p.set_defaults(episodic=True)
 
-    # Replay-buffer persistence.
-    p.add_argument('--save-episodes', dest='save_episodes', action='store_true',
-                   help='Persist completed episodes to {task_logdir}/train_eps/ '
-                        'and replay them back into the buffer on resume.')
-    p.add_argument('--no-save-episodes', dest='save_episodes', action='store_false')
-    p.set_defaults(save_episodes=True)
-    p.add_argument('--prune-every-n-episodes', type=int, default=5,
-                   help='How often to FIFO-prune the on-disk episode dir down to '
-                        '<= buffer_size transitions (1 = every episode).')
+    # Replay-buffer storage.
     p.add_argument('--buffer-storage-device', type=str, default='auto',
                    choices=['auto', 'cuda', 'cpu'],
                    help='Override the auto CUDA/CPU heuristic for the replay '

@@ -218,7 +218,7 @@ def expand_sequential_jobs(cfg: dict, *, seeds_override: list[int] | None) -> li
                     "extra_args":         list(method_cfg.get("extra_args", [])),
                     # Shared TD-MPC2 knobs (scalars).
                     "model_size":        params["model_size"],
-                    "save_freq":         params["save_freq"],
+                    "save_freq":         params.get("save_freq"),  # PWM only (analysis snapshots)
                     "image_size":        params["image_size"],
                     "max_episode_steps": params["max_episode_steps"],
                     "action_repeat":     params["action_repeat"],
