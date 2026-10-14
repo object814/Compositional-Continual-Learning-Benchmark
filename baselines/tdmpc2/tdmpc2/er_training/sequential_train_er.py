@@ -33,8 +33,9 @@ Checkpoint layout per task:
         task_modules.pt        -- reward / Qs / termination / pi / scale +
                                   head-slice Adam moments + pi_optim state
         er_episodes.pt         -- reservoir-sampled episodes for ER prefill
-        models/{step}.pt       -- periodic whole-agent snapshots (if save_freq > 0)
         eval_video/            -- TD-MPC2 video recorder output
+
+Resume works at task boundaries, as in `sequential_train.py`.
 
 Example:
     python sequential_train_er.py \\
@@ -90,6 +91,7 @@ from sequential_train import (
     save_progress,
     load_progress,
     save_wandb_run_id,
+    begin_task,
     SequentialLogger,
     eval_on_env,
     _to_td,
@@ -232,10 +234,7 @@ def load_er_episodes(path):
 def train_one_task(cfg, agent, env, buffer, logger,
                    global_step_start, eval_fn, skip_pretrain,
                    episode_reservoir,
-                   task_idx=0, num_tasks=1, task_name='',
-                   episode_dir=None, save_episodes=True,
-                   buffer_cap=None, prune_every_n_eps=5,
-                   initial_local_step=0):
+                   task_idx=0, num_tasks=1, task_name=''):
     """Online training that records completed episodes into a bounded
     online reservoir for cross-task ER dumping.
 
@@ -243,25 +242,12 @@ def train_one_task(cfg, agent, env, buffer, logger,
     calls `.add(ep_td.detach().cpu())` after every completed episode.
     Memory usage is bounded at `O(k * episode_size)` rather than growing
     linearly with step count.
-
-    `initial_local_step` lets the caller continue a task mid-flight from
-    a `models/{step}.pt` snapshot: training loop start, eval cadence,
-    pretrain gating, and `global_step_fn` all see a non-zero starting
-    step. The wandb axis therefore picks up exactly where the killed
-    run left off (any overlap in `[initial_local_step, max_old_step]` is
-    silently overwritten by wandb).
     """
     logger.global_step_fn = lambda s: global_step_start + s
-    if save_episodes and episode_dir is not None:
-        Path(episode_dir).mkdir(parents=True, exist_ok=True)
-    if buffer_cap is None:
-        buffer_cap = int(min(cfg.buffer_size, cfg.steps))
-
-    local_step = max(int(initial_local_step), 0)
+    local_step = 0
 
     pbar = tqdm(
         total=cfg.steps,
-        initial=min(local_step, cfg.steps),
         desc=f'T{task_idx + 1}/{num_tasks} {task_name}',
         unit='step',
         dynamic_ncols=True,
@@ -291,20 +277,12 @@ def train_one_task(cfg, agent, env, buffer, logger,
             if local_step % cfg.eval_freq == 0:
                 eval_next = True
 
-            if (cfg.save_freq > 0 and local_step > 0
-                    and local_step % cfg.save_freq == 0):
-                logger.save_agent(agent, identifier=local_step)
-
             if done:
                 if eval_next:
                     eval_fn(agent, local_step, global_step_start + local_step)
                     eval_next = False
 
-                # `info is not None` (not `local_step > 0`) gates the
-                # "log the just-finished episode" block. With mid-task
-                # resume the loop can begin at local_step > 0 without
-                # any env.step having been called yet, so `info` is None.
-                if info is not None:
+                if local_step > 0:
                     if info['terminated'] and not cfg.episodic:
                         raise ValueError(
                             'Termination detected but cfg.episodic=false. '
@@ -326,13 +304,6 @@ def train_one_task(cfg, agent, env, buffer, logger,
                     # in CPU memory regardless of how many episodes a task
                     # actually runs.
                     episode_reservoir.add(ep_td.detach().cpu())
-                    if save_episodes and episode_dir is not None:
-                        try:
-                            Buffer.save_episode(ep_td, episode_dir, ep_idx)
-                            if ep_idx % prune_every_n_eps == 0:
-                                Buffer.prune_episode_dir_to_cap(episode_dir, buffer_cap)
-                        except Exception as e:
-                            print(colored(f'[seq_train_er] save_episode failed: {e}', 'red'))
 
                 obs = env.reset()
                 tds = [_to_td(env, obs)]
@@ -392,7 +363,6 @@ def main(args):
         mpc=args.mpc,
         eval_freq=args.eval_freq,
         eval_episodes=args.eval_episodes,
-        save_freq=args.save_freq,
         image_size=args.image_size,
         max_episode_steps=args.max_episode_steps,
         action_repeat=args.action_repeat,
@@ -400,13 +370,9 @@ def main(args):
         episodic=args.episodic,
         enable_wandb=False,
         save_video=args.save_video,
-        save_agent=True,
         exp_name=args.exp_name,
         compile=args.compile,
-        save_episodes=args.save_episodes,
-        episode_dir=None,
         buffer_storage_device=args.buffer_storage_device,
-        prune_every_n_episodes=args.prune_every_n_episodes,
         # Offline-pretrained encoder (loaded + optionally frozen inside
         # WorldModel.__init__). None is skipped by build_task_cfg.
         pretrained_encoder=args.pretrained_encoder,
@@ -476,6 +442,7 @@ def main(args):
             project=args.wandb_project,
             entity=args.wandb_entity,
             name=run_name,
+            group=args.wandb_group,
             id=effective_run_id,
             resume='allow' if effective_run_id else None,
             dir=str(base_logdir),
@@ -487,33 +454,13 @@ def main(args):
                 'er_seed': args.er_seed,
                 **shared,
             },
-            tags=['sequential', 'tdmpc2', 'er'] + list(args.tasks),
+            tags=(args.wandb_tags if args.wandb_tags is not None
+                  else ['sequential', 'tdmpc2', 'er'] + list(args.tasks)),
         )
         try:
             save_wandb_run_id(base_logdir, wandb_run.id)
         except Exception as e:
             print(colored(f'[warn] could not persist wandb run id: {e}', 'red'))
-
-    # ---- Wandb step floor (for mid-task resume) ----------------------------
-    # When resuming an existing wandb run, wandb enforces strict step
-    # monotonicity from the run's last logged step. Re-logging at an older
-    # step is *silently dropped* (it does NOT overwrite — that was the
-    # earlier wrong assumption). To get the curve to pick up cleanly, we
-    # advance the in-task step counter forward to this floor so every new
-    # log lands at step >= last_logged_step.
-    wandb_floor = 0
-    if wandb_run is not None:
-        try:
-            wandb_floor = int(getattr(wandb_run, 'step', 0) or 0)
-        except Exception:
-            wandb_floor = 0
-        if wandb_floor > 0:
-            print(colored(
-                f'>>> Wandb step floor (resume): logs must start at step '
-                f'>= {wandb_floor}. Per-task initial_local_step will be '
-                f'advanced to this floor when applicable.',
-                'cyan',
-            ))
 
     # ---- Plan summary ------------------------------------------------------
     print('=' * 64)
@@ -537,8 +484,7 @@ def main(args):
 
         cfg = task_cfgs[task_idx]
         task_name = args.tasks[task_idx]
-        task_logdir = Path(cfg.work_dir)
-        task_logdir.mkdir(parents=True, exist_ok=True)
+        task_logdir = begin_task(base_logdir, task_idx, task_name, args.seed)
 
         print('=' * 64)
         print(colored(
@@ -556,46 +502,10 @@ def main(args):
             global_step_at_start=global_step,
         )
 
-        # Buffer isolation for in-task `train_eps/`: cross-task replay in ER
-        # comes from each previous task's reservoir-sampled `er_episodes.pt`,
-        # not from the in-task `train_eps/` dir. Once a previous task is fully
-        # completed its `train_eps/` is no longer needed for resume.
-        for j in range(task_idx):
-            prev_done = (
-                progress is not None
-                and progress.get('tasks', {}).get(str(j), {}).get('completed')
-            )
-            if not prev_done:
-                continue
-            prev_eps = (
-                base_logdir / f'task{j + 1}_{args.tasks[j]}' / 'train_eps'
-            )
-            if prev_eps.is_dir():
-                print(colored(
-                    f'>>> Removing previous-task replay dir: {prev_eps}',
-                    'yellow'))
-                shutil.rmtree(prev_eps, ignore_errors=True)
-
-        # Fresh env + buffer for this task --------------------------------
+        # Fresh env + buffer for this task; ER prefill from previous tasks
+        # follows below.
         train_env = make_env(cfg)
         buffer = Buffer(cfg)
-
-        task_episode_dir = task_logdir / 'train_eps'
-        task_buffer_cap = int(min(cfg.buffer_size, cfg.steps))
-        if args.save_episodes and task_episode_dir.is_dir():
-            stats = buffer.load_from_directory(
-                task_episode_dir, max_total_steps=task_buffer_cap)
-            if stats['episodes_restored'] > 0:
-                print(colored(
-                    f'>>> Replayed {stats["transitions_restored"]:,} transitions '
-                    f'from {stats["episodes_restored"]} episodes '
-                    f'(cap {task_buffer_cap:,}).',
-                    'green'))
-                if stats['kept_files']:
-                    dropped = Buffer.erase_over_episode_files(
-                        task_episode_dir, stats['kept_files'])
-                    if dropped:
-                        print(colored(f'>>> Pruned {dropped} stale episode files.', 'yellow'))
 
         logger = SequentialLogger(
             cfg, task_idx, num_tasks, task_name, wandb_run,
@@ -626,47 +536,6 @@ def main(args):
                 agent.load(ck)
             else:
                 raise FileNotFoundError(ck)
-
-        # ----- Mid-task resume from latest models/{step}.pt snapshot ------
-        # The naive resume logic only re-enters a task that finished cleanly
-        # (`completed: true` in progress.json). If a task died mid-flight
-        # (OOM, SIGKILL, wall-clock), the periodic snapshots written by
-        # `logger.save_agent(agent, identifier=local_step)` at every
-        # `cfg.save_freq` steps are still on disk under `<task_logdir>/models/`.
-        # We pick up the latest one here so the agent doesn't restart from a
-        # random init.
-        #
-        # This deliberately runs AFTER the previous-task-backbone load so
-        # that, for task > 0 mid-flight resumes, the snapshot (which is a
-        # whole-agent state-dict) overrides the encoder/dynamics with their
-        # latest in-task values rather than the previous-task hand-off.
-        resumed_from_snapshot_step = None
-        if not args.disable_mid_task_resume:
-            snap_dir = task_logdir / 'models'
-            if snap_dir.is_dir():
-                numeric_snaps = []
-                for p in snap_dir.glob('*.pt'):
-                    try:
-                        numeric_snaps.append((int(p.stem), p))
-                    except ValueError:
-                        pass
-                if numeric_snaps:
-                    step_n, latest = max(numeric_snaps, key=lambda x: x[0])
-                    if step_n < cfg.steps:
-                        print(colored(
-                            f'>>> MID-TASK RESUME: loading snapshot '
-                            f'{latest.name} (local step {step_n}) on top of '
-                            f'the current agent.',
-                            'cyan', attrs=['bold'],
-                        ))
-                        agent.load(latest)
-                        resumed_from_snapshot_step = step_n
-                    else:
-                        print(colored(
-                            f'>>> Snapshot {latest.name} at step {step_n} '
-                            f'is at/past cfg.steps={cfg.steps}; ignoring.',
-                            'yellow',
-                        ))
 
         # ============================================================
         # [ER] Prefill replay buffer with episodes from previous tasks
@@ -771,33 +640,9 @@ def main(args):
             f'auto={args.er_reservoir_size is None})',
             'cyan',
         ))
-        # Skip the pretraining burst whenever we're not strictly starting
-        # task 1 from a random-init agent: explicit --skip-pretrain, a
-        # later task (which inherits the prior backbone), or a mid-task
-        # snapshot resume (the agent is already well past seed_steps).
-        skip_pre = (
-            args.skip_pretrain
-            or (task_idx > 0)
-            or (resumed_from_snapshot_step is not None)
-        )
-
-        # Local-step start: max of (a) the snapshot we loaded weights from,
-        # and (b) the wandb step floor minus this task's global offset, so
-        # the first wandb.log call lands at step >= wandb_floor and isn't
-        # dropped. Clamp at cfg.steps so a stale wandb floor doesn't try to
-        # force us past the task budget.
-        snap_start = resumed_from_snapshot_step or 0
-        wandb_local_floor = max(0, wandb_floor - global_step)
-        init_local = min(max(snap_start, wandb_local_floor), int(cfg.steps))
-        if init_local > snap_start:
-            print(colored(
-                f'>>> initial_local_step advanced past snapshot '
-                f'({snap_start}) to {init_local} to clear the wandb floor '
-                f'({wandb_floor}). The model weights are from step '
-                f'{snap_start}; the wandb axis just resumes at '
-                f'{global_step + init_local}.',
-                'yellow',
-            ))
+        # Skip the pretraining burst unless task 1 starts from a random-init
+        # agent (later tasks inherit the prior backbone).
+        skip_pre = args.skip_pretrain or (task_idx > 0)
 
         train_one_task(
             cfg, agent, train_env, buffer, logger,
@@ -808,11 +653,6 @@ def main(args):
             task_idx=task_idx,
             num_tasks=num_tasks,
             task_name=task_name,
-            episode_dir=task_episode_dir,
-            save_episodes=args.save_episodes,
-            buffer_cap=task_buffer_cap,
-            prune_every_n_eps=args.prune_every_n_episodes,
-            initial_local_step=init_local,
         )
 
         # Save split checkpoint BEFORE the final cross-task eval so that
@@ -900,6 +740,8 @@ if __name__ == '__main__':
                    default='Metaworld_Tdmpc2_Sequential_ER')
     p.add_argument('--wandb-run-name', type=str, default=None)
     p.add_argument('--wandb-run-id', type=str, default=None)
+    p.add_argument('--wandb-group', type=str, default=None)
+    p.add_argument('--wandb-tags', nargs='*', default=None)
     p.add_argument('--exp-name', type=str, default='seq_tdmpc2_er')
     p.add_argument('--from-checkpoint', type=str, default=None,
                    help='Optional external checkpoint for task 1.')
@@ -916,7 +758,6 @@ if __name__ == '__main__':
     p.set_defaults(mpc=True)
     p.add_argument('--eval-freq', type=int, default=10000)
     p.add_argument('--eval-episodes', type=int, default=5)
-    p.add_argument('--save-freq', type=int, default=0)
     p.add_argument('--save-video', dest='save_video', action='store_true')
     p.add_argument('--no-save-video', dest='save_video', action='store_false')
     p.set_defaults(save_video=True)
@@ -934,10 +775,6 @@ if __name__ == '__main__':
     p.add_argument('--no-episodic', dest='episodic', action='store_false')
     p.set_defaults(episodic=True)
 
-    p.add_argument('--save-episodes', dest='save_episodes', action='store_true')
-    p.add_argument('--no-save-episodes', dest='save_episodes', action='store_false')
-    p.set_defaults(save_episodes=True)
-    p.add_argument('--prune-every-n-episodes', type=int, default=5)
     p.add_argument('--buffer-storage-device', type=str, default='auto',
                    choices=['auto', 'cuda', 'cpu'])
 
@@ -972,13 +809,6 @@ if __name__ == '__main__':
              'cfg.steps / (max_episode_steps / action_repeat)` plus ~50%% '
              'headroom (min 16). Set this directly to cap RAM use if the '
              'auto value is too large for your node.',
-    )
-    p.add_argument(
-        '--disable-mid-task-resume', action='store_true',
-        help='Disable auto-loading of the latest models/{step}.pt snapshot '
-             'when re-entering a task that did not finish. Default behaviour '
-             'is to resume from the highest-numbered snapshot and continue '
-             'training; pass this flag to force restart-from-scratch instead.',
     )
 
     main(p.parse_args())

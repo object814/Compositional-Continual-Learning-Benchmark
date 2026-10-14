@@ -18,6 +18,8 @@ previous data, this script:
   4. Saves separated checkpoints:
      - rssm.pt / task_heads.pt / actor_critic.pt — component checkpoints
      - manifest.pt — resume metadata
+     - er_episodes.pt — the task's replay episodes sampled for ER, written at
+       the end of the task (episodes are otherwise kept in memory only)
 
 Continual learning protocol:
   1. Init RSSM + task1 heads + task1 actor-critic
@@ -147,54 +149,40 @@ class MergedEpisodes:
         raise KeyError(key)
 
 
-def reservoir_sample_episodes(directory, budget, seed=0):
-    """Load episodes from a directory using reservoir sampling.
+def reservoir_sample_episodes(episodes, budget, seed=0, exclude=()):
+    """Sample a task's replay episodes for ER, at the end of that task.
 
-    Randomly shuffles episode files and loads until the transition budget is met.
-    This is equivalent to reservoir sampling when all files are available upfront.
-
-    Args:
-        directory: Path to directory containing .npz episode files.
-        budget: Maximum number of transitions to load.
-        seed: Random seed for reproducible sampling.
+    Takes the finished episodes of `episodes` (the task's in-memory episode
+    cache; ids in `exclude` are still running) in id order, shuffles them with
+    `seed`, and keeps them until the transition budget is met.
 
     Returns:
         OrderedDict of episode_id -> episode_data (numpy arrays).
     """
-    directory = pathlib.Path(directory).expanduser()
-    if not directory.exists():
-        return collections.OrderedDict()
-
-    all_files = sorted(directory.glob("*.npz"))
-    if not all_files:
-        return collections.OrderedDict()
-
+    keys = sorted(k for k in episodes.keys() if k not in exclude)
     rng = np.random.RandomState(seed)
-    indices = rng.permutation(len(all_files))
-
-    episodes = collections.OrderedDict()
+    sampled = collections.OrderedDict()
     total = 0
-    for idx in indices:
+    for idx in rng.permutation(len(keys)):
         if total >= budget:
             break
-        filename = all_files[idx]
-        try:
-            with filename.open("rb") as f:
-                episode = np.load(f)
-                episode = {k: episode[k] for k in episode.keys()}
-        except Exception as e:
-            print(f"Could not load ER episode {filename}: {e}")
-            continue
-
+        episode = {k: np.array(v) for k, v in episodes[keys[idx]].items()}
         length = len(episode["reward"]) - 1
         if length < 1:
             continue
-
-        key = f"er_{os.path.splitext(os.path.basename(filename))[0]}"
-        episodes[key] = episode
+        sampled[f"er_{keys[idx]}-{len(episode['reward'])}"] = episode
         total += length
+    return sampled
 
-    return episodes
+
+def save_er_episodes(episodes, path):
+    tmp = path.with_name(path.name + ".tmp")
+    torch.save(list(episodes.items()), tmp)
+    tmp.replace(path)
+
+
+def load_er_episodes(path):
+    return collections.OrderedDict(torch.load(path, map_location="cpu", weights_only=False))
 
 
 # ===========================================================================
@@ -557,8 +545,10 @@ def save_sequential_progress(base_logdir, task_idx, global_env_step_at_start=Non
         progress["tasks"][task_key]["completed"] = True
     if global_env_step_at_end is not None:
         progress["tasks"][task_key]["global_env_step_at_end"] = global_env_step_at_end
-    with open(progress_file, "w") as f:
+    tmp = progress_file.with_name(progress_file.name + ".tmp")
+    with open(tmp, "w") as f:
         json.dump(progress, f, indent=2)
+    tmp.replace(progress_file)  # a job killed mid-write leaves the old file intact
 
 
 def load_sequential_progress(base_logdir):
@@ -567,6 +557,25 @@ def load_sequential_progress(base_logdir):
         with open(progress_file) as f:
             return json.load(f)
     return None
+
+
+def task_seed(seed, task_idx):
+    """Seed of task `task_idx`; task 0 uses the run seed itself."""
+    return int(seed) + 10_000 * int(task_idx)
+
+
+def begin_task(base_logdir, task_idx, task_name, seed):
+    """Start task `task_idx` from its beginning: delete what an interrupted
+    attempt left in its folder and reseed. A resumed run then trains this task
+    as an uninterrupted run would (up to GPU non-determinism). Returns the
+    (empty) task folder."""
+    task_dir = pathlib.Path(base_logdir) / f"task{task_idx+1}_{task_name}"
+    if task_dir.exists():
+        print(f">>> RESUME: Deleting the unfinished attempt at task {task_idx+1}: {task_dir}")
+        shutil.rmtree(task_dir)
+    task_dir.mkdir(parents=True)
+    tools.set_seed_everywhere(task_seed(seed, task_idx))
+    return task_dir
 
 
 # ===========================================================================
@@ -578,6 +587,9 @@ def load_sequential_progress(base_logdir):
 #     task_heads.pt      — reward + cont heads (weights + optimizer)
 #     actor_critic.pt    — actor + value (weights + optimizer)
 #     manifest.pt        — {step, logger_step, task_start_step}
+# all written once, when the task ends. Resume works at task boundaries:
+# a rerun skips tasks marked completed in sequential_progress.json and
+# starts the first unfinished one from its beginning (see begin_task).
 # ---------------------------------------------------------------------------
 
 def save_task_checkpoint(agent, task_logdir, logger_step, task_start_step):
@@ -861,28 +873,13 @@ def main(args, remaining_args):
                 global_env_step = task_info["global_env_step_at_end"]
                 task_logdir_i = base_logdir / f"task{i+1}_{tasks[i]}"
                 rssm_file = task_logdir_i / "rssm.pt"
-                if rssm_file.exists():
-                    prev_rssm_path = str(rssm_file)
+                prev_rssm_path = str(rssm_file)  # checked when the next task loads it
                 print(f">>> RESUME: Task {i+1} ({tasks[i]}) already completed "
                       f"(ended at global step {global_env_step}), skipping.")
             else:
                 break
 
-    # For within-task resume, peek at manifest
     initial_logger_step = global_env_step
-    if resume_from_task_idx < num_tasks:
-        current_task_logdir = (
-            base_logdir / f"task{resume_from_task_idx+1}_{tasks[resume_from_task_idx]}"
-        )
-        manifest_path = current_task_logdir / "manifest.pt"
-        if manifest_path.exists():
-            try:
-                peek = torch.load(manifest_path, map_location="cpu")
-                initial_logger_step = peek.get("logger_step", global_env_step)
-                print(f">>> RESUME: Will resume within task {resume_from_task_idx+1} "
-                      f"at logger_step={initial_logger_step}")
-            except Exception as e:
-                print(f">>> RESUME: Could not peek at manifest: {e}")
 
     if resume_from_task_idx > 0:
         print(f">>> RESUME: Resuming from task {resume_from_task_idx + 1} "
@@ -934,14 +931,8 @@ def main(args, remaining_args):
         task_name = tasks[task_idx]
         config = task_configs[task_idx]
 
-        task_logdir = base_logdir / f"task{task_idx+1}_{task_name}"
-        traindir = task_logdir / "train_eps"
-        evaldir = task_logdir / "eval_eps"
-        task_logdir.mkdir(parents=True, exist_ok=True)
-        traindir.mkdir(parents=True, exist_ok=True)
-        evaldir.mkdir(parents=True, exist_ok=True)
-        config.traindir = traindir
-        config.evaldir = evaldir
+        # Episodes stay in memory: only end-of-task files are written here.
+        task_logdir = begin_task(base_logdir, task_idx, task_name, config.seed)
 
         print("=" * 60)
         print(f">>> SEQUENTIAL ER: Starting Task {task_idx+1}/{num_tasks}: {task_name}")
@@ -976,10 +967,8 @@ def main(args, remaining_args):
         all_eval_dirs = {}
         all_eval_caches = {}
         for j in range(task_idx + 1):
-            eval_dir_j = task_logdir / f"eval_eps_task{j+1}_{tasks[j]}"
-            eval_dir_j.mkdir(parents=True, exist_ok=True)
-            all_eval_dirs[j] = eval_dir_j
-            all_eval_caches[j] = tools.load_episodes(eval_dir_j, limit=1)
+            all_eval_dirs[j] = None  # eval episodes are not saved
+            all_eval_caches[j] = collections.OrderedDict()
 
         print(f">>> SEQUENTIAL ER: Prepared eval dirs for {task_idx + 1} task(s)")
 
@@ -997,10 +986,7 @@ def main(args, remaining_args):
 
         # ---- Load train episodes ----
         _log_mem("Before loading train episodes")
-        train_eps = tools.load_episodes(traindir, limit=config.dataset_size)
-        tools.erase_over_episodes(train_eps, config.dataset_size)
-        if config.dataset_size:
-            tools.erase_over_episode_files(traindir, train_eps)
+        train_eps = collections.OrderedDict()  # this task's episodes, in memory
         _log_mem("After loading train episodes")
 
         # ============================================================
@@ -1016,12 +1002,10 @@ def main(args, remaining_args):
                     print(f"    ER task {j+1} ({tasks[j]}): skipped "
                           f"(ratio {args.er_buffer_ratio} * dataset_size {prev_dataset_size} = 0)")
                     continue
-                prev_traindir = base_logdir / f"task{j+1}_{tasks[j]}" / "train_eps"
-                er_eps = reservoir_sample_episodes(
-                    prev_traindir,
-                    er_budget,
-                    seed=args.er_seed + j,
-                )
+                er_path = base_logdir / f"task{j+1}_{tasks[j]}" / "er_episodes.pt"
+                if not er_path.exists():
+                    raise FileNotFoundError(f"ER episodes of task {j+1} not found: {er_path}")
+                er_eps = load_er_episodes(er_path)
                 # Prefix keys to avoid collision with current task episodes
                 for key, ep in er_eps.items():
                     er_buffer[f"task{j}_{key}"] = ep
@@ -1035,7 +1019,7 @@ def main(args, remaining_args):
         # ---- Prefill replay buffer ----
         state = None
         if not config.offline_traindir:
-            prefill = max(0, config.prefill - count_steps(traindir))
+            prefill = config.prefill
             print(f">>> SEQUENTIAL ER: Prefill dataset ({prefill} steps).")
             if prefill > 0:
                 if hasattr(acts, "discrete"):
@@ -1060,7 +1044,7 @@ def main(args, remaining_args):
                     random_agent,
                     train_envs,
                     train_eps,
-                    traindir,
+                    None,
                     logger,
                     limit=config.dataset_size,
                     steps=prefill,
@@ -1090,13 +1074,7 @@ def main(args, remaining_args):
         _log_mem("After agent creation + .to(device)")
 
         # ---- Load checkpoint ----
-        resuming_within_task = False
-        if (task_logdir / "manifest.pt").exists():
-            # Resume interrupted training for this task
-            print(f">>> SEQUENTIAL ER: Resuming from: {task_logdir}")
-            manifest = load_task_checkpoint(agent, task_logdir, load_optimizers=True)
-            resuming_within_task = True
-        elif task_idx > 0 and prev_rssm_path is not None:
+        if task_idx > 0:
             # New task: load only the shared RSSM from the previous task.
             # TaskHeads + ActorCritic stay at fresh random init.
             if os.path.exists(prev_rssm_path):
@@ -1122,19 +1100,11 @@ def main(args, remaining_args):
             manifest = None
 
         # Skip pretraining for task 2+ or resume
-        if task_idx > 0 or args.skip_pretrain or resuming_within_task:
+        if task_idx > 0 or args.skip_pretrain:
             print(">>> SEQUENTIAL ER: Skipping pretraining (sequential continuation).")
             agent._should_pretrain._once = False
 
-        # Restore step tracking
-        if resuming_within_task and manifest is not None:
-            logger.step = manifest["logger_step"]
-            agent._step = logger.step // config.action_repeat
-            task_start_step = manifest["task_start_step"]
-            print(f">>> RESUME: Restored logger.step={logger.step}, "
-                  f"agent._step={agent._step}, task_start_step={task_start_step}")
-        else:
-            task_start_step = agent._step
+        task_start_step = agent._step
 
         print(f">>> SEQUENTIAL ER: Agent step: {agent._step}, task_start_step: {task_start_step}")
 
@@ -1168,7 +1138,7 @@ def main(args, remaining_args):
                       f"(step {agent._step - task_start_step}/{config.steps})")
                 _log_mem("Before training simulate")
                 state = tools.simulate(
-                    agent, train_envs, train_eps, traindir, logger,
+                    agent, train_envs, train_eps, None, logger,
                     limit=config.dataset_size, steps=config.eval_every,
                     state=state,
                 )
@@ -1181,23 +1151,24 @@ def main(args, remaining_args):
                     progress_bar.update(delta)
                     task_train_steps_done = updated
 
-                # Save checkpoint
-                save_task_checkpoint(agent, task_logdir, logger.step, task_start_step)
-
         finally:
             progress_bar.close()
 
-        # ---- Save final per-task checkpoints ----
-        # The component checkpoints (rssm.pt, task_heads.pt, actor_critic.pt)
-        # are already saved by save_task_checkpoint above.
-        # Just copy them to named versions for clarity.
-        for src_name in ["rssm.pt", "task_heads.pt", "actor_critic.pt"]:
-            src = task_logdir / src_name
-            if src.exists():
-                dst = task_logdir / src_name.replace(
-                    ".pt", f"_task{task_idx+1}.pt"
-                )
-                shutil.copy2(src, dst)
+        # ---- Save this task's checkpoints (once, at the end of the task) ----
+        save_task_checkpoint(agent, task_logdir, logger.step, task_start_step)
+
+        # ---- [ER] Sample this task's replay episodes for the later tasks ----
+        er_budget = int(args.er_buffer_ratio * int(config.dataset_size))
+        if args.er_buffer_ratio > 0 and er_budget >= 1 and task_idx < num_tasks - 1:
+            running = ({env.id for env, d in zip(train_envs, state[2]) if not d}
+                       if state is not None else set())
+            er_eps = reservoir_sample_episodes(
+                train_eps, er_budget, seed=args.er_seed + task_idx, exclude=running,
+            )
+            save_er_episodes(er_eps, task_logdir / "er_episodes.pt")
+            print(f">>> SEQUENTIAL ER: Saved {len(er_eps)} episodes "
+                  f"({sum(len(ep['reward']) - 1 for ep in er_eps.values())} transitions) "
+                  f"-> {task_logdir / 'er_episodes.pt'}")
 
         def _pt_param_count(path):
             ckpt = torch.load(path, map_location="cpu")

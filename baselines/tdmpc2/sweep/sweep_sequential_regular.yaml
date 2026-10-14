@@ -30,7 +30,6 @@ defaults:
   eval_episodes: 5
   episodic: true
   model_size: 19
-  save_freq: 50000
 tasksets:
   binpnp:
     tasks:
@@ -69,10 +68,7 @@ methods:
     entry: sequential_train.py
     wandb_project: Metaworld_Tdmpc2_Sequential
     logdir_subdir: sequential
-    extra_args:
-    - --save-episodes
-    - --prune-every-n-episodes
-    - '5'
+    extra_args: []
     tasksets:
       binpnp:
         steps:

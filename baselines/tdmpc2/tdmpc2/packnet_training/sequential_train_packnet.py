@@ -80,6 +80,7 @@ from sequential_train import (
     save_progress,
     load_progress,
     save_wandb_run_id,
+    begin_task,
     SequentialLogger,
     eval_on_env,
     _to_td,
@@ -214,15 +215,9 @@ def train_one_task(cfg, agent, env, buffer, logger,
                    global_step_start, eval_fn, skip_pretrain,
                    task_idx=0, num_tasks=1, task_name='',
                    step_budget=None, run_eval_save=True,
-                   pbar_desc=None,
-                   episode_dir=None, save_episodes=True,
-                   buffer_cap=None, prune_every_n_eps=5):
+                   pbar_desc=None):
     logger.global_step_fn = lambda s: global_step_start + s
     total_steps = cfg.steps if step_budget is None else step_budget
-    if save_episodes and episode_dir is not None:
-        Path(episode_dir).mkdir(parents=True, exist_ok=True)
-    if buffer_cap is None:
-        buffer_cap = int(min(cfg.buffer_size, cfg.steps))
 
     pbar = tqdm(
         total=total_steps,
@@ -256,10 +251,6 @@ def train_one_task(cfg, agent, env, buffer, logger,
             if run_eval_save and local_step % cfg.eval_freq == 0:
                 eval_next = True
 
-            if (run_eval_save and cfg.save_freq > 0 and local_step > 0
-                    and local_step % cfg.save_freq == 0):
-                logger.save_agent(agent, identifier=local_step)
-
             if done:
                 if eval_next:
                     eval_fn(agent, local_step, global_step_start + local_step)
@@ -280,15 +271,7 @@ def train_one_task(cfg, agent, env, buffer, logger,
                     )
                     train_metrics.update(_common())
                     logger.log_train(train_metrics)
-                    ep_td = torch.cat(tds)
-                    ep_idx = buffer.add(ep_td)
-                    if save_episodes and episode_dir is not None:
-                        try:
-                            Buffer.save_episode(ep_td, episode_dir, ep_idx)
-                            if ep_idx % prune_every_n_eps == 0:
-                                Buffer.prune_episode_dir_to_cap(episode_dir, buffer_cap)
-                        except Exception as e:
-                            print(colored(f'[seq_train_packnet] save_episode failed: {e}', 'red'))
+                    ep_idx = buffer.add(torch.cat(tds))
 
                 obs = env.reset()
                 tds = [_to_td(env, obs)]
@@ -428,7 +411,6 @@ def main(args):
         mpc=args.mpc,
         eval_freq=args.eval_freq,
         eval_episodes=args.eval_episodes,
-        save_freq=args.save_freq,
         image_size=args.image_size,
         max_episode_steps=args.max_episode_steps,
         action_repeat=args.action_repeat,
@@ -436,13 +418,9 @@ def main(args):
         episodic=args.episodic,
         enable_wandb=False,
         save_video=args.save_video,
-        save_agent=True,
         exp_name=args.exp_name,
         compile=False,
-        save_episodes=args.save_episodes,
-        episode_dir=None,
         buffer_storage_device=args.buffer_storage_device,
-        prune_every_n_episodes=args.prune_every_n_episodes,
         # Offline-pretrained encoder (loaded + optionally frozen inside
         # WorldModel.__init__). None is skipped by build_task_cfg. A frozen
         # encoder is automatically excluded from PackNet pruning/masking
@@ -535,6 +513,7 @@ def main(args):
             project=args.wandb_project,
             entity=args.wandb_entity,
             name=run_name,
+            group=args.wandb_group,
             id=effective_run_id,
             resume='allow' if effective_run_id else None,
             dir=str(base_logdir),
@@ -546,7 +525,8 @@ def main(args):
                 'packnet_retrain_ratio': args.packnet_retrain_ratio,
                 **shared,
             },
-            tags=['sequential', 'tdmpc2', 'packnet'] + list(args.tasks),
+            tags=(args.wandb_tags if args.wandb_tags is not None
+                  else ['sequential', 'tdmpc2', 'packnet'] + list(args.tasks)),
         )
         try:
             save_wandb_run_id(base_logdir, wandb_run.id)
@@ -577,8 +557,7 @@ def main(args):
 
         cfg = task_cfgs[task_idx]
         task_name = args.tasks[task_idx]
-        task_logdir = Path(cfg.work_dir)
-        task_logdir.mkdir(parents=True, exist_ok=True)
+        task_logdir = begin_task(base_logdir, task_idx, task_name, args.seed)
 
         print('=' * 64)
         print(colored(
@@ -598,42 +577,8 @@ def main(args):
             global_step_at_start=global_step,
         )
 
-        # Buffer isolation: PackNet keeps replay in-task only.
-        for j in range(task_idx):
-            prev_done = (
-                progress is not None
-                and progress.get('tasks', {}).get(str(j), {}).get('completed')
-            )
-            if not prev_done:
-                continue
-            prev_eps = (
-                base_logdir / f'task{j + 1}_{args.tasks[j]}' / 'train_eps'
-            )
-            if prev_eps.is_dir():
-                print(colored(
-                    f'>>> Removing previous-task replay dir: {prev_eps}',
-                    'yellow'))
-                shutil.rmtree(prev_eps, ignore_errors=True)
-
         train_env = make_env(cfg)
         buffer = Buffer(cfg)
-
-        task_episode_dir = task_logdir / 'train_eps'
-        task_buffer_cap = int(min(cfg.buffer_size, cfg.steps))
-        if args.save_episodes and task_episode_dir.is_dir():
-            stats = buffer.load_from_directory(
-                task_episode_dir, max_total_steps=task_buffer_cap)
-            if stats['episodes_restored'] > 0:
-                print(colored(
-                    f'>>> Replayed {stats["transitions_restored"]:,} transitions '
-                    f'from {stats["episodes_restored"]} episodes '
-                    f'(cap {task_buffer_cap:,}).',
-                    'green'))
-                if stats['kept_files']:
-                    dropped = Buffer.erase_over_episode_files(
-                        task_episode_dir, stats['kept_files'])
-                    if dropped:
-                        print(colored(f'>>> Pruned {dropped} stale episode files.', 'yellow'))
 
         logger = SequentialLogger(
             cfg, task_idx, num_tasks, task_name, wandb_run,
@@ -696,11 +641,11 @@ def main(args):
             task_idx=task_idx,
             num_tasks=num_tasks,
             task_name=task_name,
-            episode_dir=task_episode_dir,
-            save_episodes=args.save_episodes,
-            buffer_cap=task_buffer_cap,
-            prune_every_n_eps=args.prune_every_n_episodes,
         )
+
+        # Environment steps taken in this task, retraining included; the next
+        # task's global steps start after them.
+        steps_taken = cfg.steps
 
         # ============================================================
         # [PackNet] Prune -> retrain -> freeze (skip on the last task)
@@ -735,10 +680,9 @@ def main(args):
                     step_budget=retrain_steps,
                     run_eval_save=False,
                     pbar_desc=f'T{task_idx + 1} PackNet retrain',
-                    episode_dir=None,
-                    save_episodes=False,
                 )
                 packnet_manager.end_retrain()
+                steps_taken += retrain_steps
 
             packnet_manager.freeze_task(task_mask, task_idx)
 
@@ -761,8 +705,8 @@ def main(args):
                     'packnet/num_tasks_packed':
                         packnet_manager.num_tasks_packed,
                     'packnet/prune_retrain_time_s': elapsed,
-                    'global_step': global_step + cfg.steps,
-                }, step=global_step + cfg.steps)
+                    'global_step': global_step + steps_taken,
+                }, step=global_step + steps_taken)
         else:
             # Last task: store a full-active mask for eval consistency.
             task_mask = {}
@@ -788,12 +732,12 @@ def main(args):
         print(colored(f'>>> PackNet: saved state -> {pn_path}', 'cyan'))
 
         # Final cross-task eval (uses the live, post-prune backbone) ------
-        eval_fn(agent, cfg.steps, global_step + cfg.steps)
+        eval_fn(agent, cfg.steps, global_step + steps_taken)
 
         prev_backbone_path = backbone_path
         prev_legacy_ckpt = None
 
-        global_step += cfg.steps
+        global_step += steps_taken
         save_progress(
             base_logdir, task_idx, task_name=task_name,
             completed=True, global_step_at_end=global_step,
@@ -843,6 +787,8 @@ if __name__ == '__main__':
                    default='Metaworld_Tdmpc2_Sequential_PackNet')
     p.add_argument('--wandb-run-name', type=str, default=None)
     p.add_argument('--wandb-run-id', type=str, default=None)
+    p.add_argument('--wandb-group', type=str, default=None)
+    p.add_argument('--wandb-tags', nargs='*', default=None)
     p.add_argument('--exp-name', type=str, default='seq_tdmpc2_packnet')
     p.add_argument('--from-checkpoint', type=str, default=None)
 
@@ -858,7 +804,6 @@ if __name__ == '__main__':
     p.set_defaults(mpc=True)
     p.add_argument('--eval-freq', type=int, default=10000)
     p.add_argument('--eval-episodes', type=int, default=5)
-    p.add_argument('--save-freq', type=int, default=0)
     p.add_argument('--save-video', dest='save_video', action='store_true')
     p.add_argument('--no-save-video', dest='save_video', action='store_false')
     p.set_defaults(save_video=True)
@@ -873,10 +818,6 @@ if __name__ == '__main__':
     p.add_argument('--no-episodic', dest='episodic', action='store_false')
     p.set_defaults(episodic=True)
 
-    p.add_argument('--save-episodes', dest='save_episodes', action='store_true')
-    p.add_argument('--no-save-episodes', dest='save_episodes', action='store_false')
-    p.set_defaults(save_episodes=True)
-    p.add_argument('--prune-every-n-episodes', type=int, default=5)
     p.add_argument('--buffer-storage-device', type=str, default='auto',
                    choices=['auto', 'cuda', 'cpu'])
 

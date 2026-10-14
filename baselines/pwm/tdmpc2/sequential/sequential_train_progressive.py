@@ -47,7 +47,6 @@ def main(args):
         per_task_tau=args.per_task_tau,
         merged=True,
         sdp_freeze=args.sdp_freeze,
-        resume_mid_task=args.resume_mid_task,
     )
 
 
@@ -106,15 +105,7 @@ if __name__ == '__main__':
     p.add_argument('--no-episodic', dest='episodic', action='store_false')
     p.set_defaults(episodic=True)
 
-    # Replay-buffer persistence
-    p.add_argument('--save-episodes', dest='save_episodes',
-                   action='store_true',
-                   help='Persist completed episodes to {task_logdir}/train_eps/ '
-                        'and replay them back into the buffer on resume.')
-    p.add_argument('--no-save-episodes', dest='save_episodes',
-                   action='store_false')
-    p.set_defaults(save_episodes=True)
-    p.add_argument('--prune-every-n-episodes', type=int, default=5)
+    # Replay-buffer storage
     p.add_argument('--buffer-storage-device', type=str, default='auto',
                    choices=['auto', 'cuda', 'cpu'])
 
@@ -154,20 +145,6 @@ if __name__ == '__main__':
                         'tasks while keeping new-task transfer).')
     p.add_argument('--no-sdp-freeze', dest='sdp_freeze', action='store_false')
     p.set_defaults(sdp_freeze=False)
-
-    # Mid-task resume. An interrupted task otherwise restarts from step 0
-    # against the previous task's backbone, discarding everything it had
-    # learnt; the periodic `models/<step>/` snapshots already hold the state
-    # needed to continue, they were just never read back.
-    p.add_argument('--resume-mid-task', dest='resume_mid_task',
-                   action='store_true',
-                   help='On resume, continue the unfinished task from its '
-                        'newest models/<step>/ snapshot (default).')
-    p.add_argument('--no-resume-mid-task', dest='resume_mid_task',
-                   action='store_false',
-                   help='Restart the unfinished task from step 0 (the old '
-                        'behaviour).')
-    p.set_defaults(resume_mid_task=True)
 
     # Kept (unused) so resumed runs that pass --er-seed don't crash.
     p.add_argument('--er-seed', type=int, default=42, help=argparse.SUPPRESS)

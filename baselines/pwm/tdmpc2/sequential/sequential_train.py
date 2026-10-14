@@ -26,7 +26,14 @@ Checkpoint layout per task:
     <logdir>/task{N}_<task>/
         backbone.pt        -- shared backbone weights + backbone optim state
         task_modules.pt    -- this task's heads + task/π optim + MPC prev-mean
-        train_eps/         -- persisted replay episodes (FIFO-pruned)
+        models/<step>/     -- periodic {backbone,task_modules}.pt snapshots every
+                              save_freq steps, for expert_reuse/ (not resume)
+
+Resume works at task boundaries: `<logdir>/sequential_progress.json` marks a
+task completed once its files are written. Running the same command again
+skips completed tasks and starts the first unfinished one from its beginning:
+its folder from the interrupted attempt is deleted, and the task is seeded as
+in an uninterrupted run (see `begin_task`).
 
 Example:
     python sequential_train.py \\
@@ -113,31 +120,6 @@ def build_task_cfg(task_name, task_steps, task_logdir, shared_overrides, seed):
     return parse_cfg(cfg)
 
 
-def find_task_snapshot(task_logdir):
-    """Newest `models/<step>/` snapshot holding BOTH backbone.pt and
-    task_modules.pt, as `(step, backbone_path, task_modules_path)`, or None.
-
-    Both files are required: the per-task heads consume the backbone's latent,
-    so mixing a backbone from one step with heads from another would evaluate
-    a model that never existed. A snapshot interrupted mid-write can have one
-    without the other, hence the newest-first scan rather than a plain max().
-    """
-    models = Path(task_logdir) / 'models'
-    if not models.is_dir():
-        return None
-    steps = sorted(
-        (int(d.name) for d in models.iterdir()
-         if d.is_dir() and d.name.isdigit()),
-        reverse=True,
-    )
-    for step in steps:
-        bb = models / str(step) / 'backbone.pt'
-        tm = models / str(step) / 'task_modules.pt'
-        if bb.exists() and tm.exists():
-            return step, bb, tm
-    return None
-
-
 # ==========================================================================
 # Sequential progress tracking (for resume support)
 # ==========================================================================
@@ -160,7 +142,14 @@ def save_progress(base_logdir, task_idx, completed=False,
         entry["completed"] = True
     if global_step_at_end is not None:
         entry["global_step_at_end"] = int(global_step_at_end)
-    path.write_text(json.dumps(prog, indent=2))
+    _write_json_atomic(path, prog)
+
+
+def _write_json_atomic(path, obj):
+    """Write via a temporary file, so a job killed mid-write leaves the old file intact."""
+    tmp = path.with_name(path.name + '.tmp')
+    tmp.write_text(json.dumps(obj, indent=2))
+    tmp.replace(path)
 
 
 def load_progress(base_logdir):
@@ -175,7 +164,27 @@ def save_wandb_run_id(base_logdir, run_id):
     path = _progress_file(base_logdir)
     prog = json.loads(path.read_text()) if path.exists() else {"tasks": {}}
     prog["wandb_run_id"] = run_id
-    path.write_text(json.dumps(prog, indent=2))
+    _write_json_atomic(path, prog)
+
+
+def task_seed(seed, task_idx):
+    """Seed of task `task_idx`; task 0 uses the run seed itself."""
+    return int(seed) + 10_000 * int(task_idx)
+
+
+def begin_task(base_logdir, task_idx, task_name, seed):
+    """Start task `task_idx` from its beginning: delete what an interrupted
+    attempt left in its folder and reseed. A resumed run then trains this task
+    as an uninterrupted run would (up to GPU non-determinism). Returns the
+    (empty) task folder."""
+    task_dir = Path(base_logdir) / f'task{task_idx + 1}_{task_name}'
+    if task_dir.exists():
+        print(colored(f'>>> Deleting the unfinished attempt at task '
+                      f'{task_idx + 1}: {task_dir}', 'yellow'))
+        shutil.rmtree(task_dir)
+    task_dir.mkdir(parents=True)
+    set_seed(task_seed(seed, task_idx))
+    return task_dir
 
 
 # ==========================================================================
@@ -377,23 +386,16 @@ def _to_td(env, obs, action=None, reward=None, terminated=None):
 def train_one_task(cfg, agent, env, buffer, logger,
                    global_step_start, eval_fn, skip_pretrain,
                    task_idx=0, num_tasks=1, task_name='',
-                   episode_dir=None, save_episodes=True,
-                   buffer_cap=None, prune_every_n_eps=5,
                    episode_callback=None,
                    aux_buffers=None, aux_rng=None,
                    teacher_modules=None,
                    reward_anchor_coef=0.0,
                    termination_anchor_coef=0.0,
-                   merged=False, merged_main_task_id=None, aux_sizes=None,
-                   start_step=0):
+                   merged=False, merged_main_task_id=None, aux_sizes=None):
     """Run TD-MPC2's online training loop for a single task.
 
     `eval_fn(agent, local_step, global_step)` runs the cross-task evaluation.
     Returns the final local step count.
-    `start_step` resumes this task part-way through (the caller is expected to
-    have already loaded the matching weights); 0 starts the task fresh.
-    `episode_dir` (when ``save_episodes=True``) is where each completed
-    episode is dumped; FIFO-pruned to ``buffer_cap`` transitions.
     `episode_callback` (optional): when non-None, invoked as
     `episode_callback(ep_td)` after each completed episode has been added to
     the buffer.
@@ -404,10 +406,7 @@ def train_one_task(cfg, agent, env, buffer, logger,
     routing-aware anchored-ER step.
     """
     logger.global_step_fn = lambda s: global_step_start + s
-    if save_episodes and episode_dir is not None:
-        Path(episode_dir).mkdir(parents=True, exist_ok=True)
-    if buffer_cap is None:
-        buffer_cap = int(min(cfg.buffer_size, cfg.steps))
+    buffer_cap = int(min(cfg.buffer_size, cfg.steps))
 
     pbar = tqdm(
         total=cfg.steps,
@@ -416,11 +415,7 @@ def train_one_task(cfg, agent, env, buffer, logger,
         dynamic_ncols=True,
     )
 
-    # `start_step > 0` resumes this task part-way through, from a periodic
-    # snapshot. The eval / save cadences below are all modulo `local_step`,
-    # and `cfg.seed_steps` gating compares against it, so simply starting the
-    # counter higher reproduces the state the loop would have been in.
-    local_step = int(start_step)
+    local_step = 0
     ep_idx = 0
     cur_transitions = 0        # tracks current-task buffer fill (merged mode)
     start_time = time()
@@ -438,7 +433,7 @@ def train_one_task(cfg, agent, env, buffer, logger,
             global_step=global_step_start + local_step,
             episode=ep_idx,
             elapsed_time=elapsed,
-            steps_per_second=(local_step - int(start_step)) / max(elapsed, 1e-9),
+            steps_per_second=local_step / max(elapsed, 1e-9),
         )
 
     try:
@@ -480,13 +475,6 @@ def train_one_task(cfg, agent, env, buffer, logger,
                             episode_callback(ep_td)
                         except Exception as e:
                             print(colored(f'[seq_train] episode_callback failed: {e}', 'red'))
-                    if save_episodes and episode_dir is not None:
-                        try:
-                            Buffer.save_episode(ep_td, episode_dir, ep_idx)
-                            if ep_idx % prune_every_n_eps == 0:
-                                Buffer.prune_episode_dir_to_cap(episode_dir, buffer_cap)
-                        except Exception as e:
-                            print(colored(f'[seq_train] save_episode failed: {e}', 'red'))
 
                 obs = env.reset()
                 tds = [_to_td(env, obs)]
@@ -741,8 +729,7 @@ def run_continual_sequential(args, *, progressive,
                              reward_anchor_coef=0.0,
                              termination_anchor_coef=0.0,
                              merged=False,
-                             sdp_freeze=False,
-                             resume_mid_task=True):
+                             sdp_freeze=False):
     """Shared sequential continual-learning driver.
 
     Both pipelines build a DreamerV3-style split agent — a shared
@@ -820,10 +807,7 @@ def run_continual_sequential(args, *, progressive,
         save_agent=True,
         exp_name=args.exp_name,
         compile=False,  # MaskedMoEBlock state mutates; cudagraph capture invalid
-        save_episodes=args.save_episodes,
-        episode_dir=None,
         buffer_storage_device=args.buffer_storage_device,
-        prune_every_n_episodes=args.prune_every_n_episodes,
         # PRISM-WM continual
         use_moe=True,
         num_tasks=num_tasks,
@@ -1048,8 +1032,7 @@ def run_continual_sequential(args, *, progressive,
     for task_idx in range(resume_from, num_tasks):
         cfg = task_cfgs[task_idx]
         task_name = args.tasks[task_idx]
-        task_logdir = Path(cfg.work_dir)
-        task_logdir.mkdir(parents=True, exist_ok=True)
+        task_logdir = begin_task(base_logdir, task_idx, task_name, args.seed)
 
         print('=' * 64)
         print(colored(
@@ -1067,23 +1050,6 @@ def run_continual_sequential(args, *, progressive,
             base_logdir, task_idx, task_name=task_name,
             global_step_at_start=global_step,
         )
-
-        # Buffer isolation: clear completed previous tasks' replay dirs.
-        for j in range(task_idx):
-            prev_done = (
-                progress is not None
-                and progress.get('tasks', {}).get(str(j), {}).get('completed')
-            )
-            if not prev_done:
-                continue
-            prev_eps = (
-                base_logdir / f'task{j + 1}_{args.tasks[j]}' / 'train_eps'
-            )
-            if prev_eps.is_dir():
-                print(colored(
-                    f'>>> Removing previous-task replay dir: {prev_eps}',
-                    'yellow'))
-                shutil.rmtree(prev_eps, ignore_errors=True)
 
         # Fresh env + buffer for this task. make_env mutates `cfg` to set
         # `obs_shape` / `action_dim` from the env's observation space.
@@ -1104,7 +1070,8 @@ def run_continual_sequential(args, *, progressive,
                         f'expected completed-task backbone at {bb_path}; '
                         f'cannot resume from task {task_idx}.')
                 agent.load_backbone(bb_path, load_optim=True)
-                agent.start_new_task(i + 1)
+                if i + 1 < task_idx:
+                    agent.start_new_task(i + 1)
             if task_idx == 0 and args.from_checkpoint is not None:
                 ck = Path(args.from_checkpoint)
                 if (ck / 'backbone.pt').exists():
@@ -1119,24 +1086,22 @@ def run_continual_sequential(args, *, progressive,
                     raise FileNotFoundError(
                         f'--from-checkpoint dir {ck} missing backbone.pt')
 
-        task_episode_dir = task_logdir / 'train_eps'
-        task_buffer_cap = int(min(cfg.buffer_size, cfg.steps))
-        if args.save_episodes and task_episode_dir.is_dir():
-            stats = buffer.load_from_directory(
-                task_episode_dir, max_total_steps=task_buffer_cap)
-            if stats['episodes_restored'] > 0:
+        # ---- Open this task: fresh heads (progressive: the next expert slot)
+        # Done here rather than at the end of the previous task, after the
+        # same reseed, so a run resumed at this task initialises it exactly
+        # as an uninterrupted run does.
+        if task_idx > 0:
+            if progressive:
                 print(colored(
-                    f'>>> Replayed {stats["transitions_restored"]:,} '
-                    f'transitions from {stats["episodes_restored"]} '
-                    f'episodes (cap {task_buffer_cap:,}).',
-                    'green'))
-                if stats['kept_files']:
-                    dropped = Buffer.erase_over_episode_files(
-                        task_episode_dir, stats['kept_files'])
-                    if dropped:
-                        print(colored(
-                            f'>>> Pruned {dropped} stale episode files.',
-                            'yellow'))
+                    f'>>> Transition: freezing through '
+                    f'{task_idx * K_per_task} experts, opening '
+                    f'{(task_idx + 1) * K_per_task} slot.', 'cyan'))
+            else:
+                print(colored(
+                    '>>> Transition: fresh TaskModules '
+                    '(backbone MoE unchanged — static full-K).', 'cyan'))
+            set_seed(task_seed(args.seed, task_idx))
+            agent.start_new_task(task_idx)
 
         # ---- Build per-prior-task aux buffers (anchored ER, never FIFO'd).
         # Replaces the older "load ER into the main buffer" prefill — that
@@ -1225,17 +1190,11 @@ def run_continual_sequential(args, *, progressive,
                     prev_dir = base_logdir / f'task{j + 1}_{args.tasks[j]}'
                     tm_path = prev_dir / 'task_modules.pt'
                     if not tm_path.exists():
-                        ptr = prev_dir / 'models' / 'final.pt'
-                        if ptr.exists():
-                            ck = torch.load(
-                                ptr, map_location='cpu', weights_only=False)
-                            tm_path = Path(ck['task_dir']) / 'task_modules.pt'
-                        else:
-                            print(colored(
-                                f'[eval] no task_modules.pt for task {j + 1} '
-                                f'({args.tasks[j]}); skipping eval.',
-                                'yellow'))
-                            continue
+                        print(colored(
+                            f'[eval] no task_modules.pt for task {j + 1} '
+                            f'({args.tasks[j]}); skipping eval.',
+                            'yellow'))
+                        continue
                     loaded_tm = TaskModules(task_cfgs[j]).to(agent.device)
                     ck_tm = torch.load(
                         tm_path, map_location=agent.device, weights_only=False)
@@ -1311,69 +1270,16 @@ def run_continual_sequential(args, *, progressive,
             # Restore training task one-hot.
             agent.set_current_task(_task_idx)
 
-        # ---- Mid-task resume -------------------------------------------
-        # Only for the FIRST task this invocation picks up: later tasks in the
-        # same run start fresh by construction. Without this, an interrupted
-        # task restarts from step 0 against the PREVIOUS task's backbone, and
-        # every step it had already taken is thrown away -- the periodic
-        # snapshots were being written and never read.
-        task_start_step = 0
-        if resume_mid_task and task_idx == resume_from:
-            snap = find_task_snapshot(task_logdir)
-            if snap is not None:
-                snap_step, snap_bb, snap_tm = snap
-                if snap_step >= cfg.steps:
-                    print(colored(
-                        f'>>> Snapshot at {snap_step:,} >= budget '
-                        f'{cfg.steps:,}; starting the task fresh.', 'yellow'))
-                elif buffer.num_eps == 0:
-                    # Past seed_steps the loop updates on every step, so it
-                    # would sample an empty buffer immediately. Starting from
-                    # 0 refills the buffer before the first update.
-                    print(colored(
-                        f'>>> Snapshot at {snap_step:,} found, but the replay '
-                        f'buffer is empty (no train_eps to restore), so a '
-                        f'mid-task resume would sample an empty buffer on its '
-                        f'first update. Starting this task from step 0.',
-                        'red'))
-                else:
-                    agent.load_backbone(snap_bb, load_optim=True)
-                    agent.load_task_modules(snap_tm, load_optim=True)
-                    # start_new_task already opened this task's expert window
-                    # and built fresh heads; the snapshot overwrites both with
-                    # the state they had reached, optimiser moments included.
-                    agent.set_current_task(task_idx)
-                    task_start_step = int(snap_step)
-                    print(colored(
-                        f'>>> RESUME MID-TASK: restored {snap_bb.parent} '
-                        f'-> continuing task {task_idx + 1} at step '
-                        f'{snap_step:,}/{cfg.steps:,} '
-                        f'({snap_step / cfg.steps:.0%}).',
-                        'green', attrs=['bold']))
-                    print(colored(
-                        f'    active_K={agent.backbone.active_K}, '
-                        f'frozen_K={agent.backbone.frozen_K}, '
-                        f'tau={agent.backbone._dynamics.tau:.4f}', 'cyan'))
-            else:
-                print(colored(
-                    '>>> No mid-task snapshot found; starting this task '
-                    'from step 0.', 'yellow'))
-
         # ---- Train this task -------------------------------------------
         aux_rng = random.Random(er_seed + 10_000 + task_idx)
         train_one_task(
             cfg, agent, train_env, buffer, logger,
             global_step_start=global_step,
-            start_step=task_start_step,
             eval_fn=eval_fn,
             skip_pretrain=args.skip_pretrain or (task_idx > 0),
             task_idx=task_idx,
             num_tasks=num_tasks,
             task_name=task_name,
-            episode_dir=task_episode_dir,
-            save_episodes=args.save_episodes,
-            buffer_cap=task_buffer_cap,
-            prune_every_n_eps=args.prune_every_n_episodes,
             episode_callback=er_callback,
             aux_buffers=aux_buffers if aux_buffers else None,
             aux_rng=aux_rng,
@@ -1406,19 +1312,6 @@ def run_continual_sequential(args, *, progressive,
             base_logdir, task_idx, task_name=task_name,
             completed=True, global_step_at_end=global_step,
         )
-
-        # ---- Transition: prepare agent for task t+1 --------------------
-        if task_idx + 1 < num_tasks:
-            if progressive:
-                print(colored(
-                    f'>>> Transition: freezing through '
-                    f'{(task_idx + 1) * K_per_task} experts, opening '
-                    f'{(task_idx + 2) * K_per_task} slot.', 'cyan'))
-            else:
-                print(colored(
-                    '>>> Transition: fresh TaskModules '
-                    '(backbone MoE unchanged — static full-K).', 'cyan'))
-            agent.start_new_task(task_idx + 1)
 
         try:
             train_env.close()
@@ -1523,15 +1416,7 @@ if __name__ == '__main__':
     p.add_argument('--no-episodic', dest='episodic', action='store_false')
     p.set_defaults(episodic=True)
 
-    # Replay-buffer persistence.
-    p.add_argument('--save-episodes', dest='save_episodes', action='store_true',
-                   help='Persist completed episodes to {task_logdir}/train_eps/ '
-                        'and replay them back into the buffer on resume.')
-    p.add_argument('--no-save-episodes', dest='save_episodes', action='store_false')
-    p.set_defaults(save_episodes=True)
-    p.add_argument('--prune-every-n-episodes', type=int, default=5,
-                   help='How often to FIFO-prune the on-disk episode dir down to '
-                        '<= buffer_size transitions (1 = every episode).')
+    # Replay-buffer storage.
     p.add_argument('--buffer-storage-device', type=str, default='auto',
                    choices=['auto', 'cuda', 'cpu'],
                    help='Override the auto CUDA/CPU heuristic for the replay '

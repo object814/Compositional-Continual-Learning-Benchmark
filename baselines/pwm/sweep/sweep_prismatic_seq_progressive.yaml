@@ -30,7 +30,7 @@ defaults:
   eval_episodes: 5
   episodic: true
   model_size: 19
-  save_freq: 50000
+  save_freq: 50000  # models/<step>/ snapshots for expert_reuse/ (not used to resume)
 tasksets:
   binpnp:
     tasks:
@@ -70,9 +70,6 @@ methods:
     wandb_project: prismatic_seq_progressive
     logdir_subdir: prismatic_seq_progressive
     extra_args:
-    - --save-episodes
-    - --prune-every-n-episodes
-    - '5'
     - --sdp-freeze
     tasksets:
       binpnp:
