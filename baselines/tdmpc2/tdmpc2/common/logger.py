@@ -179,15 +179,6 @@ class Logger:
 	def save_agent(self, agent=None, identifier='final'):
 		if self._save_agent and agent:
 			fp = self._model_dir / f'{str(identifier)}.pt'
-			# Prune older local checkpoints first so disk holds only the
-			# most recent one — resume_from() picks the highest-step file
-			# that survives, which is the one we're about to write.
-			for existing in self._model_dir.glob('*.pt'):
-				if existing.name != fp.name:
-					try:
-						existing.unlink()
-					except OSError:
-						pass
 			agent.save(fp)
 
 	def finish(self, agent=None):

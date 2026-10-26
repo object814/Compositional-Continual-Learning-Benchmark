@@ -42,10 +42,7 @@ def load_final_agent(run, defaults: dict, geom: dict, *, task_idx=None,
     """Rebuild the agent for `task_idx` (default: the final task) and return
     `(agent, cfg, env, info)`.
 
-    Uses the newest checkpoint PAIR for that task -- the end-of-task files if
-    the task finished, otherwise the newest `models/<step>/` snapshot that has
-    both a backbone and its task heads. So a task still in training can be
-    analysed at the step it has reached.
+    Loads that task's end-of-task `backbone.pt` and `task_modules.pt`.
 
     `make_env` must run before `ContinualTDMPC2(cfg)` because it fills in
     `cfg.obs_shape` / `cfg.action_dim` / `cfg.episode_length`, which size the
@@ -55,8 +52,8 @@ def load_final_agent(run, defaults: dict, geom: dict, *, task_idx=None,
     from progmoe_training.continual_tdmpc2 import ContinualTDMPC2
 
     t = run.final_task_idx if task_idx is None else int(task_idx)
-    bb_path, tm_path, step, at_end = run.latest_checkpoint_pair(t)
-    if bb_path is None:
+    bb_path, tm_path = run.backbone_path(t), run.task_modules_path(t)
+    if not (bb_path.exists() and tm_path.exists()):
         raise FileNotFoundError(
             f'{run.name}: no backbone+task_modules pair for task {t + 1}')
 
@@ -78,14 +75,10 @@ def load_final_agent(run, defaults: dict, geom: dict, *, task_idx=None,
         f'{run.name}: checkpoint active_K={block._active_K}, expected '
         f'{expected_K} for task {t}')
 
-    budget = (run.task_steps[t] if t < len(run.task_steps) else -1)
-    info = dict(checkpoint=str(bb_path), step=step, at_end=at_end,
-                budget=budget)
+    info = dict(checkpoint=str(bb_path))
     if verbose:
-        where = ('end-of-task' if at_end
-                 else f'snapshot @ {step:,}/{budget:,} steps')
         print(f'[{run.name}] task {t + 1}/{run.num_tasks} '
-              f'({run.short_tasks()[t]}) from {where}: '
+              f'({run.short_tasks()[t]}) from end-of-task checkpoint: '
               f'active_K={block._active_K}, frozen_K={block._frozen_K}, '
               f'tau={block.tau:.4f}')
     return agent, cfg, env, info

@@ -22,12 +22,10 @@ The per-task training loop, cross-task evaluation, resume handling and
 wandb wiring are shared with the progressive-MoE pipeline via
 `run_continual_sequential(args, progressive=...)`.
 
-Checkpoint layout per task:
+Checkpoint layout per task, written when the task ends:
     <logdir>/task{N}_<task>/
         backbone.pt        -- shared backbone weights + backbone optim state
         task_modules.pt    -- this task's heads + task/π optim + MPC prev-mean
-        models/<step>/     -- periodic {backbone,task_modules}.pt snapshots every
-                              save_freq steps, for expert_reuse/ (not resume)
 
 Resume works at task boundaries: `<logdir>/sequential_progress.json` marks a
 task completed once its files are written. Running the same command again
@@ -208,9 +206,6 @@ class SequentialLogger:
         self._task_idx = task_idx
         self._num_tasks = num_tasks
         self._task_name = task_name
-        self._work_dir = Path(cfg.work_dir)
-        self._model_dir = self._work_dir / 'models'
-        self._model_dir.mkdir(parents=True, exist_ok=True)
         self._wandb = wandb_run
         self.global_step_fn = lambda s: s  # overwritten by trainer per task
         if save_video and wandb_run is not None:
@@ -223,10 +218,6 @@ class SequentialLogger:
     @property
     def video(self):
         return self._video
-
-    @property
-    def model_dir(self):
-        return self._model_dir
 
     def log_train(self, d):
         """Log per-episode training metrics under a single continuous
@@ -280,27 +271,6 @@ class SequentialLogger:
             f'R={r:.2f} S={s:.2f}  @g={gstep}'
         )
 
-    def save_agent(self, agent=None, identifier='final'):
-        if agent is None:
-            return
-        fp = self._model_dir / f'{identifier}.pt'
-        agent.save(fp)
-        # Periodic (step-numbered) saves keep only the latest snapshot on
-        # disk; named checkpoints (final.pt, …) are never pruned.
-        if str(identifier).isdigit():
-            for old in self._model_dir.glob('*.pt'):
-                if old.stem.isdigit() and int(old.stem) != int(identifier):
-                    try:
-                        old.unlink()
-                    except OSError:
-                        pass
-
-    def finish(self, agent=None):
-        if agent is not None:
-            try:
-                self.save_agent(agent, identifier='final')
-            except Exception as e:
-                print(colored(f'Save failed: {e}', 'red'))
 
 class _PrefixedVideoRecorder(VideoRecorder):
     """VideoRecorder that writes under a caller-supplied per-eval prefix so
@@ -440,10 +410,6 @@ def train_one_task(cfg, agent, env, buffer, logger,
         while local_step <= cfg.steps:
             if local_step % cfg.eval_freq == 0:
                 eval_next = True
-
-            if (cfg.save_freq > 0 and local_step > 0
-                    and local_step % cfg.save_freq == 0):
-                logger.save_agent(agent, identifier=local_step)
 
             if done:
                 if eval_next:
@@ -796,7 +762,6 @@ def run_continual_sequential(args, *, progressive,
         mpc=args.mpc,
         eval_freq=args.eval_freq,
         eval_episodes=args.eval_episodes,
-        save_freq=args.save_freq,
         image_size=args.image_size,
         max_episode_steps=args.max_episode_steps,
         action_repeat=args.action_repeat,
@@ -804,7 +769,6 @@ def run_continual_sequential(args, *, progressive,
         episodic=args.episodic,
         enable_wandb=False,  # one wandb run is driven manually below
         save_video=args.save_video,
-        save_agent=True,
         exp_name=args.exp_name,
         compile=False,  # MaskedMoEBlock state mutates; cudagraph capture invalid
         buffer_storage_device=args.buffer_storage_device,
@@ -1400,7 +1364,6 @@ if __name__ == '__main__':
     p.set_defaults(mpc=True)
     p.add_argument('--eval-freq', type=int, default=10000)
     p.add_argument('--eval-episodes', type=int, default=5)
-    p.add_argument('--save-freq', type=int, default=0)
     p.add_argument('--save-video', dest='save_video', action='store_true')
     p.add_argument('--no-save-video', dest='save_video', action='store_false')
     p.set_defaults(save_video=True)

@@ -1,7 +1,8 @@
-"""A fresh W&B run for a sequential run that is started again after an interruption.
+"""A fresh W&B run for a run that is started again after an interruption.
 
 Sequential runs resume at the beginning of their first unfinished task (see
-`begin_task` in the training scripts). W&B cannot rewind a run: the curves of the
+`begin_task` in the training scripts); single-task runs start over (`begin_run`
+in TD-MPC2 and PWM's `train.py`). W&B cannot rewind a run: the curves of the
 interrupted attempt would stay in it, and the re-trained steps would be dropped,
 since W&B only accepts increasing steps. So every restart logs into a new run:
 

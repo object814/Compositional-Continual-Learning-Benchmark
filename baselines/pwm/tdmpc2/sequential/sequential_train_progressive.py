@@ -89,7 +89,6 @@ if __name__ == '__main__':
     p.set_defaults(mpc=True)
     p.add_argument('--eval-freq', type=int, default=10000)
     p.add_argument('--eval-episodes', type=int, default=5)
-    p.add_argument('--save-freq', type=int, default=0)
     p.add_argument('--save-video', dest='save_video', action='store_true')
     p.add_argument('--no-save-video', dest='save_video', action='store_false')
     p.set_defaults(save_video=True)
