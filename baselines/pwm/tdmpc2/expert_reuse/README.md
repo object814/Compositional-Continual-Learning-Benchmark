@@ -9,7 +9,7 @@ This package is **read-only analysis**. It loads finished checkpoints from
 no checkpoint is modified, and no intervention outlives its context manager.
 
 ```
-runspec.py        find runs + their newest checkpoint pair; rebuild per-task cfg
+runspec.py        find finished runs + their end-of-task checkpoints; rebuild per-task cfg
 normalise.py      expert-normalised return (0 = failure floor, 100 = scripted expert)
 gate.py           analytic router weights + reuse metrics
 interventions.py  temporary expert ablations on the MoE routing
@@ -33,23 +33,11 @@ python expert_reuse/analyze.py --tier all
 Useful flags: `--tasksets grasp reach`, `--variant all`, `--no-wandb`,
 `--episodes N`, `--closedloop-episodes N` (`0` skips the expensive part).
 
-**Which runs get analysed.** By default: every run that has reached the LAST
-task of its taskset with at least `--min-final-steps` (200k) of training into
-it, finished or not. A run still training its final task is read from its
-newest `models/<step>/backbone.pt` snapshot; earlier tasks must still have
-closed out properly, since their gate columns are the reference the final task
-is compared against. Every figure and table marks in-flight runs with the
-fraction of the step budget reached, and reports a `settled` flag (router
-moving < 0.02 L1 per snapshot over the last three snapshots) so a number read
-at 20% of budget is never mistaken for a converged one. `--finished-only`
-restores the strict behaviour.
-
-The **causal tier no longer requires a finished run** either: it loads the
-newest `models/<step>/` snapshot that has BOTH `backbone.pt` and
-`task_modules.pt`. The pair must come from the same step -- the per-task heads
-consume the backbone's latent, so mixing steps evaluates a model that never
-existed. Nothing is copied and `sequential_progress.json` is never touched, so
-every run stays resumable by the trainer.
+**Which runs get analysed.** Only runs that finished every task of their
+taskset. Every number is read from the end-of-task `backbone.pt` and
+`task_modules.pt` the trainer writes when a task ends; runs still training are
+listed as skipped, with the reason. Nothing is copied and
+`sequential_progress.json` is never touched.
 
 Results: `expert_reuse/results/<taskset>__<seed_dir>/` (figures + `metrics.json`)
 and one wandb run per taskset in project `prismatic_moe_reuse`, grouped by
@@ -197,9 +185,8 @@ monotone affine map and both arms are full-length episodes.
 | `router_heatmap` | tasks × experts routing weights; the headline figure |
 | `final_start_vs_end` | final task's router before vs after training (the exact null) |
 | `primitive_vs_composition` | per prior block: how that primitive routed over its own experts vs how the composition task routes over them. Top row as a multiple of the uniform share (comparable across tasks despite different expert counts), bottom row renormalised within the block (shows whether the *shape* matches) |
-| `router_trajectory` | router across final-task training steps |
 | `router_vs_causal` | router weight above leave-one-out damage, shared expert axis |
 | `openloop_ablation` | latent-prediction error per ablation condition |
 | `closedloop_normalised` | expert-normalised return per condition (the headline causal figure) |
 | `closedloop_reward` | the same in raw return |
-| `reuse_summary` | old-expert mass vs both nulls, across runs; in-flight runs hatched |
+| `reuse_summary` | old-expert mass vs both nulls, across runs |

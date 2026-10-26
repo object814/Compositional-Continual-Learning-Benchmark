@@ -30,7 +30,6 @@ defaults:
   eval_episodes: 5
   episodic: true
   model_size: 19
-  save_freq: 50000  # models/<step>/ snapshots for expert_reuse/ (not used to resume)
 tasksets:
   binpnp:
     tasks:

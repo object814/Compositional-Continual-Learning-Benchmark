@@ -67,8 +67,7 @@ def _torch_load(path):
 # =======================================================================
 
 def _load_gate(path) -> tuple[torch.Tensor, float, int, int]:
-    # mmap: we need four small tensors out of a ~150MB checkpoint, and the
-    # router-trajectory figure touches ~20 of them per task.
+    # mmap: we need four small tensors out of a ~150MB checkpoint.
     sd = _torch_load(path)['model']
     W = sd['_dynamics.gate.weight'].float()
     tau = float(sd['_dynamics._tau_buf'])
@@ -118,22 +117,12 @@ def gate_table(run: RunSpec) -> dict:
     nT = run.num_tasks
 
     Ws, taus, aKs, fKs = [], [], [], []
-    steps, at_end = [], []
     for i in range(nT):
-        # Earlier tasks always have their end-of-task checkpoint (enforced by
-        # `reached_final_task`); the final one may still be in flight, in
-        # which case its newest periodic snapshot stands in.
-        path, step, is_end = run.latest_backbone(i)
-        if path is None:
-            raise FileNotFoundError(
-                f'{run.name}: no backbone checkpoint for task {i + 1}')
-        W, tau, aK, fK = _load_gate(path)
+        W, tau, aK, fK = _load_gate(run.backbone_path(i))
         Ws.append(W)
         taus.append(tau)
         aKs.append(aK)
         fKs.append(fK)
-        steps.append(step)
-        at_end.append(is_end)
 
     weights = np.full((nT, total_K), np.nan, dtype=np.float64)
     weights_start = np.full((nT, total_K), np.nan, dtype=np.float64)
@@ -153,7 +142,6 @@ def gate_table(run: RunSpec) -> dict:
         drift.append(d)
     tau_col_drift = (Ws[-1][:, TAU_COL] - Ws[0][:, TAU_COL]).abs().max().item()
 
-    final_step, final_budget = run.final_task_progress()
     return dict(
         run=run.name,
         taskset=run.taskset,
@@ -168,15 +156,6 @@ def gate_table(run: RunSpec) -> dict:
         taus=taus,
         active_Ks=aKs,
         frozen_Ks=fKs,
-        # Checkpoint provenance per row: which step it came from, and whether
-        # it is the settled end-of-task file or a mid-training snapshot.
-        row_steps=steps,
-        row_at_end=at_end,
-        final_complete=bool(at_end[-1]),
-        final_step=int(final_step),
-        final_budget=int(final_budget),
-        final_frac=(float(final_step) / final_budget
-                    if final_budget and final_budget > 0 else float('nan')),
         column_drift=drift,
         tau_col_drift=tau_col_drift,
         columns_frozen=bool(all(d == 0.0 for d in drift)),
@@ -348,36 +327,6 @@ def router_copy_similarity(tab: dict, t: int) -> dict:
     return out
 
 
-def settling(traj: dict) -> dict:
-    """How much the router is still moving near the end of training.
-
-    Runs analysed mid-final-task need this: a routing distribution read at
-    40% of the step budget is only worth quoting if it has stopped moving.
-    Snapshots are evenly spaced (`save_freq`), so the L1 distance between
-    consecutive snapshots is directly comparable within a run.
-    """
-    W, steps = traj['weights'], traj['steps']
-    nan = float('nan')
-    if W.shape[0] < 3:
-        return dict(recent_drift=nan, peak_drift=nan, drift_ratio=nan,
-                    settled=None, n_snapshots=int(W.shape[0]))
-    aK = int(np.isfinite(W[-1]).sum())
-    rows = W[:, :aK]
-    d = np.abs(np.diff(rows, axis=0)).sum(-1)     # L1 per snapshot interval
-    recent = float(d[-3:].mean())
-    peak = float(d.max())
-    return dict(
-        recent_drift=recent,
-        peak_drift=peak,
-        drift_ratio=float(recent / peak) if peak > 0 else nan,
-        # Below ~2% total L1 movement per snapshot the row has stopped
-        # meaningfully changing.
-        settled=bool(recent < 0.02),
-        n_snapshots=int(W.shape[0]),
-        snapshot_steps=[int(s) for s in steps],
-    )
-
-
 def analyze_run(run: RunSpec) -> dict:
     """Complete router analysis for one run."""
     tab = gate_table(run)
@@ -387,59 +336,5 @@ def analyze_run(run: RunSpec) -> dict:
         for t in range(1, tab['num_tasks'])
     }
     tab['final'] = tab['per_task'][-1]
-    tab['trajectory'] = router_trajectory(run, run.final_task_idx)
-    tab['settling'] = settling(tab['trajectory'])
     return tab
 
-
-# =======================================================================
-# Router trajectory during a single task (uses periodic checkpoints)
-# =======================================================================
-
-def router_trajectory(run: RunSpec, task_idx: int) -> dict:
-    """Routing distribution over training steps within one task, read from
-    the `models/<step>/backbone.pt` snapshots `save_freq` leaves behind.
-
-    Also prepends the exact start-of-task router (previous task's
-    checkpoint) at step 0. Works on runs still in flight.
-    """
-    geom = run.moe_geometry()
-    total_K = geom['total_K']
-    steps: list[int] = []
-    rows: list[np.ndarray] = []
-
-    if task_idx > 0 and run.backbone_path(task_idx - 1).exists():
-        # The previous task's end-of-task checkpoint holds this task's gate
-        # column at its initial value, and the tau it starts from.
-        W_prev, tau_prev, _, _ = _load_gate(run.backbone_path(task_idx - 1))
-        aK = (task_idx + 1) * geom['K_per_task']
-        row = np.full(total_K, np.nan)
-        row[:aK] = routing_weights(W_prev, tau_prev, task_idx, aK)
-        steps.append(0)
-        rows.append(row)
-
-    for step, path in run.periodic_checkpoints(task_idx):
-        W, tau, aK, _ = _load_gate(path)
-        row = np.full(total_K, np.nan)
-        row[:aK] = routing_weights(W, tau, task_idx, aK)
-        steps.append(step)
-        rows.append(row)
-
-    # End-of-task row, when the task actually finished. A task still in
-    # flight is already represented by its newest periodic snapshot above.
-    if run.backbone_path(task_idx).exists():
-        W, tau, aK, _ = _load_gate(run.backbone_path(task_idx))
-        row = np.full(total_K, np.nan)
-        row[:aK] = routing_weights(W, tau, task_idx, aK)
-        final_step = (run.task_steps[task_idx]
-                      if task_idx < len(run.task_steps)
-                      else (steps[-1] if steps else 0))
-        if not steps or final_step > steps[-1]:
-            steps.append(int(final_step))
-            rows.append(row)
-
-    return dict(steps=steps,
-                weights=np.array(rows) if rows else np.zeros((0, total_K)),
-                K_per_task=geom['K_per_task'],
-                total_K=total_K,
-                task_idx=task_idx)

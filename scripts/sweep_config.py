@@ -103,7 +103,6 @@ def expand_jobs(cfg: dict, *, seeds_override: list[int] | None) -> list[dict]:
                     "steps":             params["steps"],
                     "buffer_size":       params["buffer_size"],
                     "model_size":        params["model_size"],
-                    "save_freq":         params["save_freq"],
                     "image_size":        params["image_size"],
                     "max_episode_steps": params["max_episode_steps"],
                     "action_repeat":     params["action_repeat"],
@@ -114,9 +113,7 @@ def expand_jobs(cfg: dict, *, seeds_override: list[int] | None) -> list[dict]:
                     "eval_freq":         params["eval_freq"],
                     "eval_episodes":     params["eval_episodes"],
                     "episodic":          params["episodic"],
-                    # Replay-buffer persistence knobs.
-                    "save_episodes":          params.get("save_episodes", True),
-                    "prune_every_n_episodes": params.get("prune_every_n_episodes", 5),
+                    # Replay-buffer storage.
                     "buffer_storage_device":  params.get("buffer_storage_device", "auto"),
                     # Free-form Hydra overrides appended to the `python train.py …`
                     # invocation (e.g. PRISM-WM: use_moe=true use_orthogonal=true …).
@@ -218,7 +215,6 @@ def expand_sequential_jobs(cfg: dict, *, seeds_override: list[int] | None) -> li
                     "extra_args":         list(method_cfg.get("extra_args", [])),
                     # Shared TD-MPC2 knobs (scalars).
                     "model_size":        params["model_size"],
-                    "save_freq":         params.get("save_freq"),  # PWM only (analysis snapshots)
                     "image_size":        params["image_size"],
                     "max_episode_steps": params["max_episode_steps"],
                     "action_repeat":     params["action_repeat"],

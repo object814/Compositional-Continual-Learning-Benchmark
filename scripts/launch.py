@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import datetime as dt
 import json
 import os
 from pathlib import Path
@@ -38,7 +39,8 @@ def parse_args(argv=None):
     parser.add_argument('--taskset', help='Comma-separated tasksets to run, e.g. reach,grasp (default: all).')
     parser.add_argument('--method', help='Comma-separated methods to run, e.g. er,ewc (default: all).')
     parser.add_argument('--max-jobs', type=int, help='Run at most this many jobs, sequentially.')
-    parser.add_argument('--rerun-failed', action='store_true', help='Skip runs whose log directory contains done.flag.')
+    parser.add_argument('--rerun-failed', action='store_true', help='Skip runs whose log directory contains done.flag. '
+                        'Without it a finished run is trained again in <logdir>_<timestamp>.')
     parser.add_argument('--wandb-entity', default=None, help='Optional W&B account/team; otherwise use the W&B environment or login default.')
     parser.add_argument('--encoder', help='Comma-separated encoder variants: scratch, pretrained '
                         '(default: the configuration\'s encoder.variants, else scratch).')
@@ -51,8 +53,8 @@ def parse_args(argv=None):
     parser.set_defaults(freeze_encoder=True)
     parser.add_argument('--smoke', action='store_true',
                         help='Short end-to-end runs for testing an installation: tiny budgets, seed 0 unless '
-                        '--seeds is given, W&B offline unless WANDB_MODE is set, no replay episodes, videos or '
-                        f'periodic checkpoints. Remaining outputs go to {SMOKE_LOGDIR}/ and are deleted after '
+                        '--seeds is given, W&B offline unless WANDB_MODE is set, no videos. Outputs go to '
+                        f'{SMOKE_LOGDIR}/ and are deleted after '
                         'each successful run.')
     parser.add_argument('--smoke-steps', type=int, default=3000, help='Environment steps per task with --smoke.')
     args = parser.parse_args(argv)
@@ -149,9 +151,8 @@ def expand_encoder_variants(args, cfg, jobs):
 
 
 def apply_smoke(baseline, jobs, steps):
-    """Shrink budgets so warm-up, updates, evaluation and task switches each run briefly, and save as
-    little as possible: no replay episodes, videos or periodic checkpoints. Files a method needs while
-    running, such as end-of-task models, are still written."""
+    """Shrink budgets so warm-up, updates, evaluation and task switches each run briefly, without
+    videos. Files a method needs while running, such as end-of-task models, are still written."""
     every = max(steps // 3, 1)
     for job in jobs:
         n = len(job.get('tasks', [None]))
@@ -163,19 +164,11 @@ def apply_smoke(baseline, jobs, steps):
                 '--eval_every', str(every), '--log_every', str(every), '--prefill', str(min(500, steps // 4)),
                 '--no-eval-prev-video']
         elif job['mode'] == 'single':
-            job.update(steps=steps, buffer_size=steps, eval_freq=every, eval_episodes=1, save_freq=0,
-                       save_episodes=False)
+            job.update(steps=steps, buffer_size=steps, eval_freq=every, eval_episodes=1)
             job['extra_args'] = extra + ['save_video=false', 'save_agent=false']
         else:
             job.update(task_steps=[steps] * n, task_buffer_sizes=[steps] * n, eval_freq=every, eval_episodes=1)
-            if job.get('save_freq') is not None:
-                job['save_freq'] = 0
             job['extra_args'] = extra + ['--no-save-video']
-
-
-def is_sequential(baseline, job):
-    """Sequential training scripts (all DreamerV3 runs use one, single-task ones included)."""
-    return baseline == 'dreamerv3' or job['mode'] == 'sequential'
 
 
 def check_checkpoints(jobs):
@@ -201,8 +194,8 @@ def build_command(baseline, job, python='python', run_id=None):
     if baseline != 'dreamerv3' and job['mode'] == 'single':
         keys = ('task', 'seed', 'steps', 'episodic', 'model_size', 'batch_size',
                 'buffer_size', 'horizon', 'mpc', 'eval_freq', 'eval_episodes',
-                'save_freq', 'image_size', 'max_episode_steps', 'action_repeat',
-                'cameras', 'save_episodes', 'prune_every_n_episodes', 'buffer_storage_device')
+                'image_size', 'max_episode_steps', 'action_repeat', 'cameras',
+                'buffer_storage_device')
         overrides = {key: job[key] for key in keys}
         overrides.update(work_dir=job['logdir'], exp_name=job['run_name'],
                          wandb_project=job['wandb_project'], wandb_run_name=job['run_name'],
@@ -230,8 +223,8 @@ def build_command(baseline, job, python='python', run_id=None):
             flags.update({'task-steps': job['task_steps'], 'task-buffer-sizes': job['task_buffer_sizes'],
                           'logger': 'wandb', 'exp-name': job['run_name']})
             for key in ('model_size', 'batch_size', 'horizon', 'eval_freq', 'eval_episodes',
-                        'save_freq', 'image_size', 'max_episode_steps', 'action_repeat', 'cameras'):
-                if job.get(key) is not None:                     # save_freq: PWM only
+                        'image_size', 'max_episode_steps', 'action_repeat', 'cameras'):
+                if job.get(key) is not None:
                     flags[key.replace('_', '-')] = job[key]
         for key, val in flags.items():
             cmd.append('--' + key)
@@ -269,8 +262,14 @@ def main(argv=None):
     if args.smoke and not os.environ.get('WANDB_MODE'):
         extra_env['WANDB_MODE'] = 'offline'
     print('# Run these commands from the project root.', flush=True)
+    stamp = dt.datetime.now().strftime('%Y%m%d-%H%M%S')
     for job in jobs:
         run_id = None
+        if not args.smoke and (ROOT / job['logdir'] / 'done.flag').exists():
+            # A finished run is never overwritten: running it again trains a new copy in
+            # <logdir>_<timestamp>, logged to W&B as <run name>_<timestamp>.
+            job['logdir'] += '_' + stamp
+            job['run_name'] += '_' + stamp
         logdir = ROOT / job['logdir']
         if not args.dry_run:
             if args.smoke:
@@ -278,10 +277,10 @@ def main(argv=None):
             logdir.mkdir(parents=True, exist_ok=True)
             id_file = logdir / 'wandb_run_id.txt'
             run_id = id_file.read_text().strip() if id_file.exists() else ''
-            if (run_id and is_sequential(args.baseline, job) and not args.smoke
-                    and not (logdir / 'done.flag').exists()):
+            if run_id and not args.smoke:
                 # Started again after an interruption: training resumes at the first unfinished
-                # task, and W&B continues in a new run holding the completed tasks' history.
+                # task (single-task runs start over), and W&B continues in a new run holding the
+                # completed tasks' history.
                 run_id = wandb_restart.restart(job, run_id, logdir)
             run_id = run_id or secrets.token_hex(4)
             id_file.write_text(run_id + '\n')

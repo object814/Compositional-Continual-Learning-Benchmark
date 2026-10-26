@@ -85,22 +85,7 @@ def run_router_tier(run: RunSpec, outdir: Path, wb=None) -> dict:
     if f is not None:
         figs['primitive_vs_composition'] = f
 
-    f = plots.router_trajectory(tab['trajectory'], tab, outdir)
-    if f is not None:
-        figs['router_trajectory'] = f
-
     final = tab['final']
-    st = tab['settling']
-    if tab['final_complete']:
-        print(f'  final task trained to completion '
-              f'({tab["final_step"]:,} steps)')
-    else:
-        print(f'  final task STILL TRAINING: analysed at '
-              f'{tab["final_step"]:,}/{tab["final_budget"]:,} steps '
-              f'({tab["final_frac"]:.0%} of budget)')
-    print(f'  router settling: recent drift {st["recent_drift"]:.4f} L1 per '
-          f'snapshot (peak {st["peak_drift"]:.3f}) -> '
-          f'{"settled" if st["settled"] else "STILL MOVING"}')
     print(f'  routing isolation: prior gate columns unchanged='
           f'{tab["columns_frozen"]} (max drift '
           f'{max(tab["column_drift"]) if tab["column_drift"] else 0:.2e}), '
@@ -138,12 +123,6 @@ def run_router_tier(run: RunSpec, outdir: Path, wb=None) -> dict:
             'final/router_l1_movement': final['router_l1_movement'],
             'check/prior_gate_columns_frozen': tab['columns_frozen'],
             'check/tau_column_frozen': tab['tau_col_frozen'],
-            'maturity/final_complete': tab['final_complete'],
-            'maturity/final_step': tab['final_step'],
-            'maturity/final_budget': tab['final_budget'],
-            'maturity/final_frac': tab['final_frac'],
-            'maturity/recent_drift': tab['settling']['recent_drift'],
-            'maturity/settled': tab['settling']['settled'],
             'copy/cosine': copy_stats(tab)['cos'],
             'copy/cosine_no_tau': copy_stats(tab)['cos_no_tau'],
             'copy/cosine_tau_only_baseline': copy_stats(tab)['tau_only'],
@@ -350,8 +329,6 @@ def run_rollout_tier(run: RunSpec, tab: dict, outdir: Path, args,
                     continue
                 summ[f'causal/normalised_drop/{name}'] = (
                     base_n - r['normalised_return'])
-        summ['causal/checkpoint_step'] = ck_info['step']
-        summ['causal/checkpoint_at_end'] = ck_info['at_end']
         wb.summary.update(summ)
 
         # per-expert causal table, aligned with the router weights
@@ -384,14 +361,6 @@ def main():
                    help='Restrict to these tasksets (default: all found).')
     p.add_argument('--seed-dirs', nargs='*', default=None,
                    help='Restrict to these seed dir names.')
-    p.add_argument('--min-final-steps', type=int, default=200_000,
-                   help='Minimum training steps into the FINAL task for a run '
-                        'to be analysed. Runs still training use their newest '
-                        'models/<step>/backbone.pt snapshot. Set 0 for no '
-                        'floor.')
-    p.add_argument('--finished-only', action='store_true',
-                   help='Only analyse runs that completed every task '
-                        '(the old behaviour).')
     p.add_argument('--outdir', type=Path, default=DEFAULT_OUTDIR)
     p.add_argument('--episodes', type=int, default=20,
                    help='Episodes collected once for the open-loop tier.')
@@ -422,55 +391,23 @@ def main():
     if args.seed_dirs:
         runs = [r for r in runs if r.seed_dir in args.seed_dirs]
 
-    # Selection is per TIER, not global. The router tier runs on anything that
-    # reached the final task; the rollout tier additionally needs that task's
-    # `task_modules.pt`, which only exists once the task closes out. Gating
-    # BOTH on `is_finished` would silently shrink the router results whenever
-    # the rollout tier is requested, and overwrite the cross-run figure with
-    # the smaller set.
-    if args.finished_only:
-        selected = [r for r in runs if r.is_finished()]
-    else:
-        selected = [r for r in runs
-                    if r.reached_final_task(args.min_final_steps)]
+    # Only runs that finished every task of their taskset: every number is
+    # read from the end-of-task checkpoints.
+    selected = [r for r in runs if r.is_finished()]
     rejected = [r for r in runs if r not in selected]
     wants_rollout = args.tier in ('rollout', 'all')
-    # The rollout tier needs a backbone+heads pair, which every periodic
-    # snapshot provides -- the task does NOT have to have finished.
-    causal_ready = [r for r in selected if r.has_causal_checkpoint()]
 
     print('=' * 70)
     print(f'expert-reuse analysis   tier={args.tier}   variant={args.variant}')
-    if args.finished_only:
-        print('selection: fully finished runs only')
-    else:
-        print(f'selection: reached final task with >= '
-              f'{args.min_final_steps:,} steps into it')
-    if wants_rollout:
-        print(f'causal tier: {len(causal_ready)}/{len(selected)} runs have a '
-              f'usable backbone+heads checkpoint (end-of-task or snapshot)')
+    print('selection: runs that finished every task')
     print('=' * 70)
     print(f'analysing ({len(selected)}):')
     for r in selected:
-        step, budget = r.final_task_progress()
-        frac = f'{step / budget:.0%}' if budget > 0 else '?'
-        mark = 'complete' if r.is_finished() else f'in flight {frac}'
-        if wants_rollout:
-            mark += (', router+causal' if r.has_causal_checkpoint()
-                     else ', router only')
-        print(f'  {r.name:<32} {" -> ".join(r.short_tasks())}  [{mark}]')
+        print(f'  {r.name:<32} {" -> ".join(r.short_tasks())}')
     if rejected:
         print(f'skipped ({len(rejected)}):')
         for r in rejected:
-            step, budget = r.final_task_progress()
-            if r.yaml_num_tasks and r.num_tasks != r.yaml_num_tasks:
-                why = (f'only on task {r.num_tasks}/{r.yaml_num_tasks} '
-                       f'of the sequence')
-            elif step < args.min_final_steps:
-                why = (f'final task only {max(step, 0):,} steps '
-                       f'(< {args.min_final_steps:,})')
-            else:
-                why = (r.missing()[0] if r.missing() else 'incomplete')
+            why = r.missing()[0] if r.missing() else 'unfinished'
             print(f'  {r.name:<32} {why}')
     print()
     if not selected:
@@ -521,14 +458,8 @@ def main():
                     print('  causal tier SKIPPED: results already present '
                           '(--skip-existing-causal)')
             if wants_rollout and not already:
-                if run.has_causal_checkpoint():
-                    record['causal'] = run_rollout_tier(
-                        run, r1['table'], outdir, args, wb=wb)
-                else:
-                    why = ('no snapshot with BOTH backbone.pt and '
-                           'task_modules.pt for the final task')
-                    print(f'  causal tier SKIPPED: {why}')
-                    record['causal_skipped'] = why
+                record['causal'] = run_rollout_tier(
+                    run, r1['table'], outdir, args, wb=wb)
         except Exception:
             traceback.print_exc()
             record['error'] = traceback.format_exc()
@@ -561,36 +492,26 @@ def main():
         print(f'cross-run summary figure -> {args.outdir}/reuse_summary.png')
 
         print('\n' + '=' * 88)
-        print(f'{"run":<30} {"final":>7} {"old-mass":>9} {"null":>7} '
-              f'{"index":>6} {"topexp":>7} {"x-unif":>7} {"settled":>8} '
+        print(f'{"run":<30} {"old-mass":>9} {"null":>7} '
+              f'{"index":>6} {"topexp":>7} {"x-unif":>7} '
               f'{"copy-cos":>9} {"top-agree":>10}')
-        print('-' * 106)
+        print('-' * 90)
         for r in ok:
             tab = r['router']
             f = tab['final']
             null = (f['start_null'] if np.isfinite(f['start_null'])
                     else f['uniform_null'])
             idx = f['old_mass'] / null if null else float('nan')
-            mat = ('done' if tab['final_complete']
-                   else f'{tab["final_frac"]:.0%}')
-            st = tab['settling']['settled']
             cp = copy_stats(tab)
-            print(f'{r["run"]:<30} {mat:>7} {f["old_mass"]:>9.3f} '
+            print(f'{r["run"]:<30} {f["old_mass"]:>9.3f} '
                   f'{null:>7.3f} {idx:>6.2f} '
                   f'{("#" + str(f["top_expert"]) + ("*" if f["top_expert_is_old"] else "")):>7} '
                   f'{f["top_expert_ratio"]:>7.2f} '
-                  f'{("yes" if st else "NO" if st is not None else "?"):>8} '
                   f'{cp["cos_no_tau"]:>9.3f} '
                   f'{(str(cp["match_no_tau"]) + "/" + str(cp["n"])):>10}')
-        print('=' * 106)
+        print('=' * 90)
         print('* = the most-used expert on the final task is a frozen expert '
               'from an earlier task')
-        print('final = steps into the final task, as a fraction of its budget')
-        print('settled = router moved < 0.02 L1 per snapshot over the last 3 '
-              'snapshots.')
-        print('         For a `done` run the number is final either way; the '
-              'flag only qualifies')
-        print('         the in-flight rows, whose value can still move.')
         print('copy-cos  = mean cosine between the final task\'s routing '
               'ordering WITHIN each prior')
         print('            block and that block\'s own task\'s ordering, '

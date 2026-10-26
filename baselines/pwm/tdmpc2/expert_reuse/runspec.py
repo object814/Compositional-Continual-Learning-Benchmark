@@ -95,8 +95,9 @@ class RunSpec:
         return self.task_dirs[task_idx] / 'task_modules.pt'
 
     def is_finished(self) -> bool:
-        """Every task marked complete in sequential_progress.json AND every
-        end-of-task backbone/task_modules checkpoint present on disk.
+        """Every task of the taskset started, marked complete in
+        sequential_progress.json, AND its end-of-task backbone/task_modules
+        checkpoint present on disk. Only such runs are analysed.
 
         `save_task` runs just before `save_progress(completed=True)`, so the
         two can disagree if a job died in between; requiring both is the
@@ -104,6 +105,8 @@ class RunSpec:
         """
         return (
             len(self.tasks) > 1
+            and (not self.yaml_num_tasks
+                 or self.num_tasks == self.yaml_num_tasks)
             and all(self.completed)
             and all(self.backbone_path(i).exists() for i in range(self.num_tasks))
             and all(self.task_modules_path(i).exists() for i in range(self.num_tasks))
@@ -111,6 +114,9 @@ class RunSpec:
 
     def missing(self) -> list[str]:
         out = []
+        if self.yaml_num_tasks and self.num_tasks != self.yaml_num_tasks:
+            out.append(f'only on task {self.num_tasks}/{self.yaml_num_tasks} '
+                       f'of the sequence')
         for i in range(self.num_tasks):
             if not self.completed[i]:
                 out.append(f'task{i + 1} not marked complete')
@@ -120,123 +126,14 @@ class RunSpec:
                 out.append(f'task{i + 1} task_modules.pt missing')
         return out
 
-    # ---- runs still training their final task -------------------------
-    def latest_backbone(self, task_idx: int) -> tuple[Path | None, int, bool]:
-        """Newest usable backbone checkpoint for one task.
-
-        Returns `(path, step, is_end_of_task)`. Prefers the end-of-task
-        `backbone.pt`; falls back to the newest `models/<step>/backbone.pt`
-        snapshot so a task still in flight can still be analysed. `step` is
-        the task's full budget when the end-of-task file is used, the
-        snapshot's step otherwise, and -1 when nothing exists.
-        """
-        end = self.backbone_path(task_idx)
-        if end.exists():
-            budget = (self.task_steps[task_idx]
-                      if task_idx < len(self.task_steps) else -1)
-            return end, int(budget), True
-        periodic = self.periodic_checkpoints(task_idx)
-        if periodic:
-            step, path = periodic[-1]
-            return path, int(step), False
-        return None, -1, False
-
-    def latest_task_modules(self, task_idx: int) -> tuple[Path | None, int, bool]:
-        """Newest usable task-heads checkpoint for one task, mirroring
-        `latest_backbone`.
-
-        The two MUST come from the same snapshot: the per-task reward/Q/pi
-        heads consume the backbone's latent, so pairing a backbone from one
-        step with heads from another silently evaluates a model that never
-        existed. `latest_checkpoint_pair` is the accessor to use.
-        """
-        end = self.task_modules_path(task_idx)
-        if end.exists():
-            budget = (self.task_steps[task_idx]
-                      if task_idx < len(self.task_steps) else -1)
-            return end, int(budget), True
-        for step, bb in reversed(self.periodic_checkpoints(task_idx)):
-            tm = bb.parent / 'task_modules.pt'
-            if tm.exists():
-                return tm, int(step), False
-        return None, -1, False
-
-    def latest_checkpoint_pair(self, task_idx: int):
-        """`(backbone_path, task_modules_path, step, is_end_of_task)` taken
-        from the SAME checkpoint, or `(None, None, -1, False)` if no step has
-        both files.
-
-        Prefers the end-of-task pair; otherwise walks the periodic snapshots
-        newest-first for the first step that has both. A snapshot written
-        while the trainer was interrupted can have the backbone but not the
-        heads, so the newest backbone is not always usable.
-        """
-        bb_end = self.backbone_path(task_idx)
-        tm_end = self.task_modules_path(task_idx)
-        if bb_end.exists() and tm_end.exists():
-            budget = (self.task_steps[task_idx]
-                      if task_idx < len(self.task_steps) else -1)
-            return bb_end, tm_end, int(budget), True
-        for step, bb in reversed(self.periodic_checkpoints(task_idx)):
-            tm = bb.parent / 'task_modules.pt'
-            if tm.exists():
-                return bb, tm, int(step), False
-        return None, None, -1, False
-
-    def has_causal_checkpoint(self, task_idx: int | None = None) -> bool:
-        """Whether a backbone+heads pair exists for the task, which is all the
-        rollout tier needs -- the task does not have to have finished."""
-        t = self.final_task_idx if task_idx is None else task_idx
-        return self.latest_checkpoint_pair(t)[0] is not None
-
-    def final_task_progress(self) -> tuple[int, int]:
-        """`(steps_trained, budget)` for the last started task."""
-        _, step, _ = self.latest_backbone(self.final_task_idx)
-        budget = (self.task_steps[self.final_task_idx]
-                  if self.final_task_idx < len(self.task_steps) else -1)
-        return step, budget
-
-    def reached_final_task(self, min_final_steps: int = 0) -> bool:
-        """The run has started the LAST task of its taskset, has at least
-        `min_final_steps` of training into it, and every earlier task closed
-        out with a proper end-of-task checkpoint.
-
-        The earlier-task requirement is not negotiable: their gate columns
-        are what the final task's routing is compared against, and a task
-        that never wrote `backbone.pt` has no settled column to compare to.
-        """
-        if self.yaml_num_tasks and self.num_tasks != self.yaml_num_tasks:
-            return False          # still on an earlier task of the sequence
-        if self.num_tasks < 2:
-            return False
-        for i in range(self.final_task_idx):
-            if not (self.completed[i] and self.backbone_path(i).exists()):
-                return False
-        path, step, _ = self.latest_backbone(self.final_task_idx)
-        return path is not None and step >= min_final_steps
-
-    # ---- intermediate (periodic) checkpoints --------------------------
-    def periodic_checkpoints(self, task_idx: int) -> list[tuple[int, Path]]:
-        """`models/<step>/backbone.pt` snapshots written every `save_freq`
-        steps during the task, sorted by step. Lets us watch the router move
-        during training (and works on runs still in flight)."""
-        models = self.task_dirs[task_idx] / 'models'
-        if not models.is_dir():
-            return []
-        out = []
-        for d in models.iterdir():
-            if d.is_dir() and d.name.isdigit() and (d / 'backbone.pt').exists():
-                out.append((int(d.name), d / 'backbone.pt'))
-        return sorted(out)
-
     # ---- geometry read straight off the checkpoint --------------------
     def moe_geometry(self) -> dict:
         """total_K / K_per_task / active_K / tau, read from the final
         backbone.pt rather than reconstructed from flags."""
         if self._geom_cache is not None:
             return self._geom_cache
-        path, _, _ = self.latest_backbone(self.final_task_idx)
-        if path is None:
+        path = self.backbone_path(self.final_task_idx)
+        if not path.exists():
             raise FileNotFoundError(
                 f'{self.name}: no backbone checkpoint for task '
                 f'{self.final_task_idx + 1}')
@@ -298,8 +195,6 @@ class RunSpec:
             save_video=False,
             save_agent=False,
             compile=False,
-            save_episodes=False,
-            episode_dir=None,
             use_moe=True,
             num_tasks=self.num_tasks,
             progressive_moe=True,
@@ -391,9 +286,3 @@ def discover_runs(logdir: Path = SWEEP_LOGDIR,
 def finished_runs(**kw) -> list[RunSpec]:
     return [r for r in discover_runs(**kw) if r.is_finished()]
 
-
-def final_task_runs(min_final_steps: int = 0, **kw) -> list[RunSpec]:
-    """Runs that have reached the last task of their taskset with at least
-    `min_final_steps` of training into it -- finished or not."""
-    return [r for r in discover_runs(**kw)
-            if r.reached_final_task(min_final_steps)]

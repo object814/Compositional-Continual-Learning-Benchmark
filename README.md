@@ -138,7 +138,7 @@ Single-task baselines use `sweep_single.yaml` (TD-MPC2, DreamerV3) and
 `baselines/<baseline>/sweep/logdir/`, and metrics to Weights & Biases as set
 in `.env`.
 
-**Resuming.** If a sequential run stops, run the same command again (add
+**Resuming.** If a run stops, run the same command again (add
 `--rerun-failed` to skip finished runs). Each task's models, and what the
 method carries to later tasks (ER episodes, EWC Fisher, PackNet masks), are
 saved when the task ends, and `sequential_progress.json` in the run's log
@@ -147,8 +147,11 @@ starts the first unfinished task again from its beginning, seeded as in an
 uninterrupted run; nothing is saved during a task, so training is not slowed
 down. In Weights & Biases the resumed run continues in a new run holding the
 history of the completed tasks; the interrupted one is moved to the group
-`<group>_failed`. DreamerV3 single-task runs use the sequential script, so they
-also restart from the beginning.
+`<group>_failed`. Single-task runs of every baseline restart from the
+beginning in the same way; their model is saved once, when training ends.
+A finished run is never overwritten: without `--rerun-failed`, running it
+again trains a new copy in `<logdir>_<timestamp>`, logged to Weights & Biases
+as `<run name>_<timestamp>`.
 
 Curricula (`--taskset`), trained in order:
 

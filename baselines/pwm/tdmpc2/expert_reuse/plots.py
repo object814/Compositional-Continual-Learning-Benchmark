@@ -70,16 +70,6 @@ def _save(fig, outdir: Path, name: str) -> Path:
     return png
 
 
-def _maturity_note(tab: dict) -> str:
-    """Caption fragment marking whether the final row is a settled
-    end-of-task checkpoint or a mid-training snapshot."""
-    if tab.get('final_complete', True):
-        return ''
-    return (f'  ·  final row read mid-training at '
-            f'{tab["final_step"]:,}/{tab["final_budget"]:,} steps '
-            f'({tab["final_frac"]:.0%})')
-
-
 def _block_colors(num_blocks: int) -> list[str]:
     return [CATEGORICAL[i % len(CATEGORICAL)] for i in range(num_blocks)]
 
@@ -152,7 +142,7 @@ def router_heatmap(tab: dict, outdir: Path, name='router_heatmap') -> Path:
     ax.set_title(
         f'{tab["taskset"]} / {tab["seed_dir"]} — router weight per expert\n'
         f'gate input is the task one-hot only, so each row is constant '
-        f'across states{_maturity_note(tab)}', loc='left', color=INK_2,
+        f'across states', loc='left', color=INK_2,
         fontsize=9)
     _draw_block_strip(ax, total_K, K, nT, y=nT - 0.5 + 0.35, h=0.32)
     ax.set_ylim(nT - 0.5 + 0.95, -0.5)
@@ -211,8 +201,8 @@ def start_vs_end(tab: dict, outdir: Path, name='final_start_vs_end') -> Path:
     ax.set_ylabel('routing weight')
     ax.set_title(
         f'{tab["taskset"]} / {tab["seed_dir"]} — final task '
-        f'({tab["tasks"][t]}): the router is learned, not inherited'
-        f'{_maturity_note(tab)}', loc='left', fontsize=9, color=INK_2)
+        f'({tab["tasks"][t]}): the router is learned, not inherited',
+        loc='left', fontsize=9, color=INK_2)
     ax.legend(frameon=False, fontsize=8, loc='upper right')
     ax.grid(axis='y', color=GRID, linewidth=0.7)
     ax.set_axisbelow(True)
@@ -228,36 +218,22 @@ def start_vs_end(tab: dict, outdir: Path, name='final_start_vs_end') -> Path:
 def reuse_summary(tables: list[dict], outdir: Path,
                   name='reuse_summary') -> Path:
     """Old-expert routing mass on each run's final task, against both nulls."""
-    labels, old, uni, start, partial = [], [], [], [], []
+    labels, old, uni, start = [], [], [], []
     for tab in tables:
         f = tab['final']
-        done = tab.get('final_complete', True)
-        suffix = '' if done else f'\n({tab["final_frac"]:.0%} trained)'
         labels.append(f'{tab["taskset"]}\n'
-                      f'{tab["seed_dir"].replace("seed_", "s")}{suffix}')
+                      f'{tab["seed_dir"].replace("seed_", "s")}')
         old.append(f['old_mass'])
         uni.append(f['uniform_null'])
         start.append(f['start_null'])
-        partial.append(not done)
 
     x = np.arange(len(labels))
     fig, ax = plt.subplots(figsize=(1.35 * len(labels) + 2.6, 3.9))
     bars = ax.bar(x, old, 0.5, color='#1c5cab', edgecolor=SURFACE,
                   linewidth=1.2)
-    # In-flight runs are hatched as well as labelled, so the distinction is
-    # not carried by the tick text alone.
-    for b, isp in zip(bars, partial):
-        if isp:
-            b.set_hatch('///')
-            b.set_edgecolor('#ffffff')
-    # Explicit proxies: labelling the real bars would give both legend keys
-    # the hatch of whichever bar came first.
     from matplotlib.patches import Patch
     handles = [Patch(facecolor='#1c5cab', edgecolor=SURFACE,
                      label='learned mass on prior experts')]
-    if any(partial):
-        handles.append(Patch(facecolor='#1c5cab', edgecolor='#ffffff',
-                             hatch='///', label='final task still training'))
     # The two nulls land almost on top of each other (that agreement is
     # itself the result), so they are drawn at different widths to stay
     # separately legible.
@@ -429,56 +405,14 @@ def primitive_vs_composition(tab: dict, outdir: Path,
                loc='lower center', bbox_to_anchor=(0.5, -0.035))
     fig.suptitle(
         f'{tab["taskset"]} / {tab["seed_dir"]} — does the composition task '
-        f'reuse each primitive the way that primitive did?'
-        f'{_maturity_note(tab)}',
+        f'reuse each primitive the way that primitive did?',
         x=0.02, ha='left', fontsize=9.5, color=INK_2)
     fig.tight_layout(rect=(0, 0.02, 1, 0.94))
     return _save(fig, outdir, name)
 
 
 # =======================================================================
-# 4. Router trajectory during the final task
-# =======================================================================
-
-def router_trajectory(traj: dict, tab: dict, outdir: Path,
-                      name='router_trajectory') -> Path:
-    steps, Wt = traj['steps'], traj['weights']
-    if Wt.shape[0] < 2:
-        return None
-    K, nT = traj['K_per_task'], tab['num_tasks']
-    t = traj['task_idx']
-    aK = (t + 1) * K
-    Wt = Wt[:, :aK]
-
-    fig, ax = plt.subplots(figsize=(0.62 * aK + 3.2, 0.32 * len(steps) + 2.4))
-    im = ax.imshow(Wt, cmap=CMAP_SEQ, vmin=0, vmax=float(np.nanmax(Wt)),
-                   aspect='auto')
-    ax.set_yticks(range(len(steps)))
-    ax.set_yticklabels([f'{s // 1000}k' for s in steps], fontsize=7.5)
-    ax.set_xticks(range(aK))
-    ax.set_xticklabels([str(k) for k in range(aK)], fontsize=7.5)
-    for j in range(1, t + 1):
-        ax.axvline(j * K - 0.5, color=SURFACE, linewidth=2.5)
-    ax.set_xlabel('expert index', labelpad=16)
-    ax.set_ylabel('training step within final task')
-    st = tab.get('settling', {})
-    settled = st.get('settled')
-    tail = ('' if settled is None else
-            ('  ·  settled' if settled
-             else f'  ·  still moving ({st["recent_drift"]:.3f} L1/snapshot)'))
-    ax.set_title(
-        f'{tab["taskset"]} / {tab["seed_dir"]} — router during final-task '
-        f'training{tail}', loc='left', fontsize=9, color=INK_2)
-    _draw_block_strip(ax, aK, K, t + 1, y=len(steps) - 0.5 + 0.3, h=0.3)
-    ax.set_ylim(len(steps) - 0.5 + 0.85, -0.5)
-    cb = fig.colorbar(im, ax=ax, fraction=0.025, pad=0.02)
-    cb.set_label('routing weight', fontsize=8)
-    cb.outline.set_visible(False)
-    return _save(fig, outdir, name)
-
-
-# =======================================================================
-# 5. Causal per-expert importance (leave-one-expert-out)
+# 4. Causal per-expert importance (leave-one-expert-out)
 # =======================================================================
 
 def causal_heatmap(tab: dict, loo: dict, outdir: Path,
@@ -539,7 +473,7 @@ def causal_heatmap(tab: dict, loo: dict, outdir: Path,
 
 
 # =======================================================================
-# 6. Ablation conditions
+# 5. Ablation conditions
 # =======================================================================
 
 def ablation_bars(results: dict, tab: dict, outdir: Path, *, metric: str,

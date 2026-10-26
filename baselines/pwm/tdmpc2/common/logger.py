@@ -145,23 +145,6 @@ class Logger:
 		group_override = cfg.get("wandb_group", None)
 		tags_override = cfg.get("wandb_tags", None)
 
-		# Resolve the wandb run id with logdir-based persistence:
-		#   1. explicit cfg.wandb_run_id wins (sweep harness / manual override)
-		#   2. else: re-use {work_dir}/wandb_run_id.txt if present (resume)
-		#   3. else: let wandb generate a fresh id, then persist it after init
-		# so subsequent re-launches against the same logdir auto-attach.
-		run_id_file = self._log_dir / "wandb_run_id.txt"
-		if not pinned_id and run_id_file.exists():
-			try:
-				pinned_id = run_id_file.read_text().strip() or None
-				if pinned_id:
-					print(colored(
-						f"Resuming wandb run id from {run_id_file}: {pinned_id}",
-						"blue", attrs=["bold"]))
-			except Exception as e:
-				print(colored(f"Failed to read {run_id_file}: {e}", "red"))
-				pinned_id = None
-
 		init_kwargs = dict(
 			project=self.project,
 			entity=self.entity,
@@ -177,17 +160,6 @@ class Logger:
 			# (re-attaches). `must` would reject the first-launch case.
 			init_kwargs["resume"] = "allow"
 		wandb.init(**init_kwargs)
-		# Persist the wandb-assigned run id so the next launch with the same
-		# logdir resumes against the same wandb run. No-op when the file
-		# already exists (resume case) or wandb didn't yield an id.
-		try:
-			wid = getattr(getattr(wandb, "run", None), "id", None)
-			if wid and not run_id_file.exists():
-				run_id_file.write_text(str(wid))
-				print(colored(f"Saved wandb run id to {run_id_file}: {wid}",
-				              "blue"))
-		except Exception as e:
-			print(colored(f"Failed to persist wandb run id: {e}", "red"))
 		print(colored("Logs will be synced with wandb.", "blue", attrs=["bold"]))
 		self._wandb = wandb
 		self._video = (
@@ -208,13 +180,6 @@ class Logger:
 		if self._save_agent and agent:
 			fp = self._model_dir / f'{str(identifier)}.pt'
 			agent.save(fp)
-			if self._wandb:
-				artifact = self._wandb.Artifact(
-					self._group + '-' + str(self._seed) + '-' + str(identifier),
-					type='model',
-				)
-				artifact.add_file(fp)
-				self._wandb.log_artifact(artifact)
 
 	def finish(self, agent=None):
 		try:

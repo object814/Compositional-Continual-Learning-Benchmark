@@ -18,7 +18,6 @@ cnn_minres: 4
 checkpoint: ???
 eval_episodes: 10
 eval_freq: 50000
-save_freq: 0  # env-step interval for periodic agent checkpoints (0 disables; `final.pt` is always written)
 
 # training
 steps: 10_000_000
@@ -126,11 +125,8 @@ compile: true
 save_video: true
 save_agent: true
 seed: 1
-# replay buffer persistence
-save_episodes: true
-episode_dir: null              # default: {work_dir}/train_eps
+# replay buffer
 buffer_storage_device: auto    # auto | cuda | cpu — `auto` keeps the original mem-free heuristic
-prune_every_n_episodes: 5      # how often to FIFO-prune {episode_dir} down to ≤ buffer_size transitions
 
 # convenience
 work_dir: ???

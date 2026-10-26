@@ -333,11 +333,7 @@ def evaluation_section(run, tab, defaults, geom, args) -> dict:
             **{f'drop_block{j}': f'leave-one-out: primitive task T{j + 1} '
                                  f'experts removed' for j in range(t)},
         },
-        checkpoint=dict(path=ck_info['checkpoint'], step=int(ck_info['step']),
-                        budget=int(ck_info['budget']),
-                        at_end=bool(ck_info['at_end']),
-                        frac=_f(ck_info['step'] / ck_info['budget'])
-                        if ck_info['budget'] > 0 else None),
+        checkpoint=dict(path=ck_info['checkpoint']),
         scale=dict(task=run.tasks[t], failure_floor=_f(normaliser.floor),
                    expert_return=_f(normaliser.expert),
                    note='normalised = 100*(R-floor)/(expert-floor)'),
@@ -407,10 +403,9 @@ def main():
             print(f'--- {ts}: run {name} NOT FOUND, skipping')
             failures.append((ts, 'run not found'))
             continue
-        if not run.has_causal_checkpoint():
-            print(f'--- {ts}: {name} has no backbone+heads checkpoint, '
-                  f'skipping')
-            failures.append((ts, 'no usable checkpoint'))
+        if not run.is_finished():
+            print(f'--- {ts}: {name} has not finished every task, skipping')
+            failures.append((ts, 'run not finished'))
             continue
 
         print(f'\n--- {ts}  ({name}) ---')
@@ -429,9 +424,6 @@ def main():
                 num_tasks=run.num_tasks,
                 K_per_task=geom['K_per_task'],
                 total_K=geom['total_K'],
-                final_task_complete=bool(tab['final_complete']),
-                final_task_step=int(tab['final_step']),
-                final_task_budget=int(tab['final_budget']),
                 router=router_section(run, tab),
             )
             rec['evaluation'] = evaluation_section(

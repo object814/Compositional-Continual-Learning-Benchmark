@@ -1,5 +1,4 @@
-"""CPU self-test for the normalisation, checkpoint-pair discovery and the
-trainer's mid-task snapshot finder.
+"""CPU self-test for the normalisation and the discovery of finished runs.
 
 Runs against the real logdir, so it checks the pieces the GPU tier depends on
 without needing a GPU.
@@ -78,21 +77,17 @@ def main():
           Normaliser('metaworld_reach-v3', _Cfg(), table)(-100.0) != Normaliser(
               'metaworld_reach-v3', _Cfg(), table)(-100.0))
 
-    print('\ncheckpoint-pair discovery on the real logdir')
+    print('\nfinished-run discovery on the real logdir')
     runs = discover_runs(variant='preEncFr')
-    reached = [r for r in runs if r.reached_final_task(200_000)]
-    check('runs discovered', len(reached) >= 10, f'{len(reached)} runs')
-    n_causal = 0
-    for r in reached:
-        bb, tm, step, at_end = r.latest_checkpoint_pair(r.final_task_idx)
-        ok = bb is not None and tm is not None
-        n_causal += int(ok)
-        if ok:
-            check(f'{r.name}: pair from one step, both files exist',
-                  bb.parent == tm.parent and bb.exists() and tm.exists(),
-                  f'step {step:,}{" (end)" if at_end else ""}')
-    check('every reached run is causal-eligible', n_causal == len(reached),
-          f'{n_causal}/{len(reached)}')
+    finished = [r for r in runs if r.is_finished()]
+    check('finished runs discovered', len(finished) >= 1,
+          f'{len(finished)} of {len(runs)} runs')
+    for r in finished:
+        t = r.final_task_idx
+        check(f'{r.name}: end-of-task checkpoints of every task exist',
+              all(r.backbone_path(i).exists() and r.task_modules_path(i).exists()
+                  for i in range(r.num_tasks)),
+              f'final task {r.short_tasks()[t]}')
 
     print()
     if FAILED:
