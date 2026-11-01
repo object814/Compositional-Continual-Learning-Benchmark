@@ -19,7 +19,7 @@ import yaml
 
 import wandb_restart
 from sweep_config import (
-    _is_sequential_schema, apply_filters, apply_pretrained_encoder,
+    BACKEND, _is_sequential_schema, apply_filters, apply_pretrained_encoder,
     expand_dreamer_jobs, expand_jobs, expand_sequential_jobs, parse_filters,
 )
 
@@ -104,7 +104,7 @@ def select_jobs(args):
             matrix.append({'method': method, 'tasksets': selected})
         cfg['matrix'] = matrix
     if args.smoke:
-        cfg['logdir_root'] = f'{SMOKE_LOGDIR}/{args.baseline}'
+        cfg['logdir_root'] = f'{SMOKE_LOGDIR}/{BACKEND}/{args.baseline}'
     if args.baseline == 'dreamerv3':
         expand = expand_dreamer_jobs
     else:

@@ -4,11 +4,12 @@ seeds:
 - 0
 - 1
 - 2
-logdir_root: baselines/pwm/sweep/logdir
+logdir_root: 'baselines/pwm/sweep/logdir/{backend}'
 naming:
-  run_name: '{taskset}_seed{seed}'
-  wandb_group: '{taskset}'
+  run_name: '{backend}_{taskset}_seed{seed}'
+  wandb_group: '{backend}_{taskset}'
   wandb_tags:
+  - '{backend}'
   - '{method}'
   - '{taskset}'
   - seed{seed}

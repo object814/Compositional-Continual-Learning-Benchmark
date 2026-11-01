@@ -4,11 +4,12 @@ seeds:
 - 0
 - 1
 - 2
-logdir_root: baselines/dreamerv3/sweep/logdir
+logdir_root: 'baselines/dreamerv3/sweep/logdir/{backend}'
 naming:
-  run_name: '{method}_{taskset}_seed{seed}'
-  wandb_group: '{method}_{taskset}'
+  run_name: '{backend}_{method}_{taskset}_seed{seed}'
+  wandb_group: '{backend}_{method}_{taskset}'
   wandb_tags:
+  - '{backend}'
   - '{method}'
   - '{taskset}'
   - seed{seed}

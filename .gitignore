@@ -5,7 +5,6 @@ __pycache__/
 
 # Training outputs and checkpoints
 baselines/*/sweep/logdir/
-smoke_logs*/
 checkpoints/
 wandb/
 outputs/
@@ -13,13 +12,7 @@ multirun/
 *.pt
 *.pth
 
-# Local tool state (conda envs, Warp kernel and other caches, see mjwenv/workspace.py)
+# Local state: conda envs, Warp kernel and other caches (see mjwenv/workspace.py), W&B settings
 .conda/
 .cache/
 .env
-.vscode/
-.idea/
-*.sif
-
-# CPU-vs-warp comparison runs (local only)
-validation/

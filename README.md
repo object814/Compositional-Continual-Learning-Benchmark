@@ -167,8 +167,9 @@ Useful options:
 
 Single-task baselines use `sweep_single.yaml` (TD-MPC2, DreamerV3) and
 `sweep_single_prism.yaml` (PWM). Logs go to
-`baselines/<baseline>/sweep/logdir/`, and metrics to Weights & Biases as set
-in `.env`.
+`baselines/<baseline>/sweep/logdir/gpu_warp/`, and metrics to Weights & Biases
+as set in `.env`. W&B run names and groups start with `gpu_warp_` (`cpu_` on
+`main`), so runs of the two versions never share a log directory or a W&B run.
 
 **Resuming.** If a run stops, run the same command again (add
 `--rerun-failed` to skip finished runs). Each task's models, and what the
