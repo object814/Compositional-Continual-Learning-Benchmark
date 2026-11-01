@@ -1,6 +1,6 @@
 """Discovery + config reconstruction for finished sequential-CL runs.
 
-A `RunSpec` points at one `sweep/logdir/prismatic_seq_progressive/{taskset}/
+A `RunSpec` points at one `sweep/logdir/<backend>/prismatic_seq_progressive/{taskset}/
 {seed_dir}` directory and knows:
 
   - the ordered task list and each task's checkpoint directory
@@ -38,7 +38,9 @@ import torch
 _HERE = Path(__file__).resolve().parent
 TDMPC2_PKG = _HERE.parent                      # .../tdmpc2/tdmpc2
 REPO_ROOT = TDMPC2_PKG.parent                  # .../tdmpc2
-SWEEP_LOGDIR = REPO_ROOT / 'sweep' / 'logdir' / 'prismatic_seq_progressive'
+# Runs of the checked-out simulator: sweep/logdir/<cpu|gpu_warp>/ (see scripts/sweep_config.py)
+BACKEND = 'gpu_warp' if (REPO_ROOT.parents[1] / 'mjwenv' / '__init__.py').is_file() else 'cpu'
+SWEEP_LOGDIR = REPO_ROOT / 'sweep' / 'logdir' / BACKEND / 'prismatic_seq_progressive'
 SWEEP_YAML = REPO_ROOT / 'sweep' / 'sweep_prismatic_seq_progressive.yaml'
 
 

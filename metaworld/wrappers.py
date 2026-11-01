@@ -462,6 +462,7 @@ class ProprioMultiImageObsWrapper(gym.ObservationWrapper):
                 "image": images_space,
             }
         )
+        self._last_images = None
 
     def _get_camera_id(self, camera_name: str) -> int:
         """Get camera id from camera name."""
@@ -496,6 +497,7 @@ class ProprioMultiImageObsWrapper(gym.ObservationWrapper):
         gripper_state = np.asarray([obs[3]], dtype=np.float32)
         proprio = np.concatenate([hand_pos, hand_vel, gripper_state], axis=0)
         images = self._get_multi_camera_frames().astype(np.uint8)  # (H,W,3*N)
+        self._last_images = images
 
         original_obs = np.concatenate([obs[:18], obs[21:39], obs[42:]], axis=0) # remove velocity duplicate
 
@@ -510,15 +512,17 @@ class ProprioMultiImageObsWrapper(gym.ObservationWrapper):
 
         Args:
             camera_name: If provided, render from this named camera.
-                         Otherwise use the free (default) camera.
+                         Otherwise return the observation cameras of the last
+                         frame side by side (H, W * N, 3), as the MuJoCo-Warp
+                         env does.
         """
         if self.render_mode == "rgb_array":
+            if camera_name is None:
+                images = self._last_images if self._last_images is not None else self._get_multi_camera_frames()
+                return np.concatenate([images[..., 3 * i:3 * i + 3] for i in range(len(self.camera_names))], axis=1)
             data = self.env.unwrapped.data
-            if camera_name is not None:
-                cam_id = self._get_camera_id(camera_name)
-                self._renderer.update_scene(data, camera=cam_id)
-            else:
-                self._renderer.update_scene(data)
+            cam_id = self._get_camera_id(camera_name)
+            self._renderer.update_scene(data, camera=cam_id)
             return self._renderer.render().copy()
         return self.env.render()
 

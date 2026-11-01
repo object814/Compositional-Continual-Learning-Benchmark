@@ -76,6 +76,11 @@ which is distributed separately:
 mkdir -p checkpoints && cp /path/to/encoder_ms19.pt checkpoints/
 ```
 
+### Caches
+
+Every cache the code writes (`torch.compile`, Mesa, W&B, ...) goes to
+`.cache/` in the repository, not to your home directory.
+
 ## Verify the installation
 
 ```bash
@@ -135,8 +140,10 @@ Useful options:
 
 Single-task baselines use `sweep_single.yaml` (TD-MPC2, DreamerV3) and
 `sweep_single_prism.yaml` (PWM). Logs go to
-`baselines/<baseline>/sweep/logdir/`, and metrics to Weights & Biases as set
-in `.env`.
+`baselines/<baseline>/sweep/logdir/cpu/`, and metrics to Weights & Biases as
+set in `.env`. W&B run names and groups start with `cpu_` (`gpu_warp_` on the
+`mujoco-warp` branch), so runs of the two versions never share a log directory
+or a W&B run.
 
 **Resuming.** If a run stops, run the same command again (add
 `--rerun-failed` to skip finished runs). Each task's models, and what the

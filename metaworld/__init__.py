@@ -27,6 +27,9 @@ from metaworld.wrappers import (
     RandomTaskSelectWrapper,
     RNNBasedMetaRLWrapper,
 )
+from metaworld.workspace import use_workspace_caches
+
+use_workspace_caches()   # caches go to <repo>/.cache, not the home directory
 
 
 class Benchmark(abc.ABC):

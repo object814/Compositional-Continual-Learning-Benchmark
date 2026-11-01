@@ -4,7 +4,7 @@ Does the router reuse earlier tasks' experts when learning the final task of a
 sequence?
 
 This package is **read-only analysis**. It loads finished checkpoints from
-`sweep/logdir/prismatic_seq_progressive/` and writes only into
+`sweep/logdir/<backend>/prismatic_seq_progressive/` and writes only into
 `expert_reuse/results/` and wandb. No training file is imported by the trainer,
 no checkpoint is modified, and no intervention outlives its context manager.
 

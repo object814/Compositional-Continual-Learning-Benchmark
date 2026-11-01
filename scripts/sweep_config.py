@@ -1,11 +1,17 @@
 """Expand the retained training configurations without starting training."""
 from __future__ import annotations
 import datetime as dt
+from pathlib import Path
+
+# Simulator the checked-out code trains on: 'gpu_warp' on the mujoco-warp branch (which has
+# mjwenv/), 'cpu' on main. Available to naming templates and logdir_root as {backend}, so runs
+# of the two versions never share a log directory, W&B run name or W&B group.
+BACKEND = "gpu_warp" if (Path(__file__).resolve().parents[1] / "mjwenv" / "__init__.py").is_file() else "cpu"
 
 DEFAULT_NAMING = {
-    "run_name": "{method}_{taskset}_seed{seed}",
-    "wandb_group": "{method}_{taskset}",
-    "wandb_tags": ["{method}", "{taskset}", "seed{seed}", "{date}", "{sweep_id}"],
+    "run_name": "{backend}_{method}_{taskset}_seed{seed}",
+    "wandb_group": "{backend}_{method}_{taskset}",
+    "wandb_tags": ["{backend}", "{method}", "{taskset}", "seed{seed}", "{date}", "{sweep_id}"],
     "logdir_folder": "{taskset}/seed_{seed}",
 }
 
@@ -61,7 +67,7 @@ def expand_jobs(cfg: dict, *, seeds_override: list[int] | None) -> list[dict]:
     seeds = seeds_override if seeds_override is not None else cfg["seeds"]
     sweep_id = cfg["sweep_id"]
     today = dt.date.today().isoformat()
-    logdir_root = cfg["logdir_root"]
+    logdir_root = _fmt(cfg["logdir_root"], {"backend": BACKEND})
     wandb_entity = cfg.get("wandb_entity")
     naming = {**DEFAULT_NAMING, **(cfg.get("naming") or {})}
     defaults = cfg.get("defaults") or {}
@@ -77,7 +83,7 @@ def expand_jobs(cfg: dict, *, seeds_override: list[int] | None) -> list[dict]:
             for seed in seeds:
                 ctx = {
                     "method": method, "taskset": taskset, "seed": seed,
-                    "sweep_id": sweep_id, "date": today,
+                    "sweep_id": sweep_id, "date": today, "backend": BACKEND,
                 }
                 run_name = _fmt(naming["run_name"], ctx)
                 wandb_group = _fmt(naming["wandb_group"], ctx)
@@ -142,7 +148,7 @@ def expand_sequential_jobs(cfg: dict, *, seeds_override: list[int] | None) -> li
     seeds = seeds_override if seeds_override is not None else cfg["seeds"]
     sweep_id = cfg["sweep_id"]
     today = dt.date.today().isoformat()
-    logdir_root = cfg["logdir_root"]
+    logdir_root = _fmt(cfg["logdir_root"], {"backend": BACKEND})
     wandb_entity = cfg.get("wandb_entity")
     naming = {**DEFAULT_NAMING, **(cfg.get("naming") or {})}
     defaults = cfg.get("defaults") or {}
@@ -187,7 +193,7 @@ def expand_sequential_jobs(cfg: dict, *, seeds_override: list[int] | None) -> li
             for seed in seeds:
                 ctx = {
                     "method": method, "taskset": taskset, "seed": seed,
-                    "sweep_id": sweep_id, "date": today,
+                    "sweep_id": sweep_id, "date": today, "backend": BACKEND,
                 }
                 run_name = _fmt(naming["run_name"], ctx)
                 wandb_group = _fmt(naming["wandb_group"], ctx)
@@ -249,7 +255,7 @@ def expand_dreamer_jobs(cfg: dict, *, seeds_override: list[int] | None) -> list[
     seeds = seeds_override if seeds_override is not None else cfg["seeds"]
     sweep_id = cfg["sweep_id"]
     today = dt.date.today().isoformat()
-    logdir_root = cfg["logdir_root"]
+    logdir_root = _fmt(cfg["logdir_root"], {"backend": BACKEND})
     wandb_entity = cfg.get("wandb_entity")
     naming = {**DEFAULT_NAMING, **(cfg.get("naming") or {})}
 
@@ -272,7 +278,7 @@ def expand_dreamer_jobs(cfg: dict, *, seeds_override: list[int] | None) -> list[
             for seed in seeds:
                 ctx = {
                     "method": method, "taskset": taskset, "seed": seed,
-                    "sweep_id": sweep_id, "date": today,
+                    "sweep_id": sweep_id, "date": today, "backend": BACKEND,
                 }
                 run_name = _fmt(naming["run_name"], ctx)
                 wandb_group = _fmt(naming["wandb_group"], ctx)
