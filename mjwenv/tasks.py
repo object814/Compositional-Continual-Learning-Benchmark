@@ -454,6 +454,7 @@ class BoxCloseEnv(BatchedSawyerEnv):
 
     XML = "sawyer_box.xml"
     FRESH_LAYOUT = True
+    NJMAX = 1024                       # the lid on the box walls: many contacts at once
     SETTLE_LAYOUT = True
     EXTRA_SETTLE_STEPS = 5
     BOX_MIN_DIST = 0.35
@@ -812,6 +813,7 @@ class CompoPickPlaceBoxCloseEnv(BatchedSawyerEnv):
     """
 
     XML = "compo_pickplace_boxclose.xml"
+    NJMAX = 1024                       # the lid on the box walls: many contacts at once
     GOAL_MARKER = "phase2"             # goal site alpha 0 until the block is in, then white
     FRESH_LAYOUT = True
     XY_LOW = (-0.25, 0.45)

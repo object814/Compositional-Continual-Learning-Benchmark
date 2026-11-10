@@ -146,6 +146,9 @@ class BatchedSawyerEnv:
     FRESH_LAYOUT = False
     LOCKED_ACTION: int | None = None   # action dimension fixed to 0 (2-D reach tasks)
     EXTRA_SETTLE_STEPS = 0             # physics steps after the hand settle, final layout in place
+    # Constraint rows per world (MJWarp njmax). When a step needs more, MJWarp
+    # drops the extra contacts, so tasks with many contacts at once raise it.
+    NJMAX = 512
 
     def __init__(
         self,
@@ -158,7 +161,7 @@ class BatchedSawyerEnv:
         device: str | None = None,
         solver_tolerance: float | None = 1e-6,
         nconmax: int = 96,
-        njmax: int = 256,
+        njmax: int | None = None,      # default: the task's NJMAX
         use_cuda_graph: bool = True,
         render: bool = True,
         render_shadows: bool = True,
@@ -166,6 +169,7 @@ class BatchedSawyerEnv:
         fix_static_geoms: bool = True,
     ):
         self.num_envs = int(num_envs)
+        njmax = int(njmax or self.NJMAX)
         self.image_size = int(image_size)
         self.cameras = list(cameras)
         self.action_repeat = int(action_repeat)

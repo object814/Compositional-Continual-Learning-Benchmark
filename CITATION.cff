@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this benchmark or code, please cite the paper below."
+title: "Compositional Continual Learning Benchmark"
+type: software
+authors:
+  - family-names: Zhou
+    given-names: Haoyu
+  - family-names: Watson
+    given-names: Joe
+  - family-names: Lei
+    given-names: Anson
+  - family-names: Posner
+    given-names: Ingmar
+repository-code: "https://github.com/object814/Compositional-Continual-Learning-Benchmark"
+url: "https://object814.github.io/Compositional-Continual-Learning/"
+license: MIT
+preferred-citation:
+  type: article
+  title: "Benchmarking World Models for Continual Learning on Compositional Tasks"
+  authors:
+    - family-names: Zhou
+      given-names: Haoyu
+    - family-names: Watson
+      given-names: Joe
+    - family-names: Lei
+      given-names: Anson
+    - family-names: Posner
+      given-names: Ingmar
+  journal: "arXiv preprint arXiv:2609.22055"
+  year: 2026
+  doi: "10.48550/arXiv.2609.22055"
+  url: "https://arxiv.org/abs/2609.22055"

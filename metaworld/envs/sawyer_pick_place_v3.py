@@ -42,7 +42,6 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
     ) -> None:
         if initialise_region == 'small':
             # Small initial region: Metaworld original
-            print(">>> Using small initial region")
             goal_low = (-0.1, 0.8, 0.05)
             goal_high = (0.1, 0.9, 0.3)
             hand_low = (-0.5, 0.40, 0.05)
@@ -51,7 +50,6 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
             obj_high = (0.1, 0.7, 0.02)
         elif initialise_region == 'large':
             # Large initial region
-            print(">>> Using large initial region")
             goal_low = (-0.25, 0.4, 0.1)
             goal_high = (0.0, 0.7, 0.3)
             hand_low = (-0.5, 0.40, 0.05)
@@ -59,7 +57,6 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
             obj_low = (0.0, 0.5, 0.02)
             obj_high = (0.25, 0.8, 0.02)
         elif initialise_region == 'fixed':
-            print(">>> Using fixed initial region")
             goal_low = (-0.11, 0.8, 0.2)
             goal_high = (-0.1, 0.8, 0.2)
             hand_low = (-0.5, 0.40, 0.05)
