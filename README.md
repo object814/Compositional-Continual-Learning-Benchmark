@@ -196,6 +196,21 @@ env = ProprioMultiImageObsWrapper(env, image_height=128, image_width=128,
                                   camera_names=["topview", "front", "gripperPOV"])
 ```
 
+### Scripted experts
+
+Every task has a privileged, state-based scripted policy in
+`metaworld/expert_policy/`; the best of its returns is the 100 of the
+normalised scores (see [Evaluation protocol](#evaluation-protocol)). To roll
+them out and record success rates, videos or demonstrations:
+
+```bash
+python -m metaworld.expert_policy.rollout                    # every task, 10 episodes each
+python -m metaworld.expert_policy.rollout --tasks reach-xy-v3 --episodes 20 --videos 3
+python -m metaworld.expert_policy.rollout --npz              # also save every episode as .npz
+```
+
+Results go to `outputs/expert_rollouts/`.
+
 ## Repository layout
 
 ```
@@ -204,6 +219,7 @@ baselines/pwm/         PWM: code, sweep configurations, expert-reuse analysis
 baselines/dreamerv3/   DreamerV3: code and sweep configurations
 metaworld/             benchmark environments (CPU reference) and assets
 mjwenv/                the same tasks on MuJoCo-Warp (GPU), used for training
+metaworld/expert_policy/   scripted expert policies and their rollout script
 scripts/launch.py      runs a sweep configuration
 scripts/check_env.py   installation check
 scripts/check_warp_parity.py, scripts/bench_warp.py   GPU-simulation checks

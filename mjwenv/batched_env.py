@@ -6,7 +6,7 @@ camera images with MJWarp's batched ray tracer. Observations, rewards and
 success tests are computed with torch on tensors that alias the MJWarp state,
 so only the final observation batch leaves the device.
 
-It mirrors the CPU pipeline of the main branch,
+It mirrors the CPU pipeline of the mujoco-cpu branch,
   gymnasium.make("Meta-World/MT1", env_name=...)   (task reset / step / reward)
   -> ProprioMultiImageObsWrapper(topview, front, gripperPOV),
 with these conventions:

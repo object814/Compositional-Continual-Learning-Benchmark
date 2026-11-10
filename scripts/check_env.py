@@ -23,9 +23,9 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 
-PACKAGES = ['torch', 'torchvision', 'tensordict', 'torchrl', 'numpy', 'mujoco', 'mujoco_warp', 'warp',
+PACKAGES = ['torch', 'tensordict', 'torchrl', 'numpy', 'mujoco', 'mujoco_warp', 'warp',
             'gymnasium', 'gym',
-            'OpenGL', 'cv2', 'scipy', 'hydra', 'hydra_plugins.hydra_submitit_launcher', 'submitit',
+            'OpenGL', 'cv2', 'scipy', 'hydra',
             'omegaconf', 'ruamel.yaml', 'yaml', 'termcolor', 'wandb', 'tensorboard',
             'moviepy', 'imageio', 'cloudpickle', 'psutil', 'PIL', 'pandas', 'matplotlib', 'tqdm']
 
