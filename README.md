@@ -174,6 +174,21 @@ On the `main` branch, `mjwenv.MetaWorldWarpEnv` provides the same tasks
 with the same interface on the GPU, and `mjwenv.make_batched_env` simulates
 many worlds of one task in a single batch.
 
+### Scripted experts
+
+Every task has a privileged, state-based scripted policy in
+`metaworld/expert_policy/`; the best of its returns is the 100 of the
+normalised scores (see [Evaluation protocol](#evaluation-protocol)). To roll
+them out and record success rates, videos or demonstrations:
+
+```bash
+python -m metaworld.expert_policy.rollout                    # every task, 10 episodes each
+python -m metaworld.expert_policy.rollout --tasks reach-xy-v3 --episodes 20 --videos 3
+python -m metaworld.expert_policy.rollout --npz              # also save every episode as .npz
+```
+
+Results go to `outputs/expert_rollouts/`.
+
 ## Repository layout
 
 ```
@@ -181,6 +196,7 @@ baselines/tdmpc2/      TD-MPC2: code (tdmpc2/) and sweep configurations (sweep/)
 baselines/pwm/         PWM: code, sweep configurations, expert-reuse analysis
 baselines/dreamerv3/   DreamerV3: code and sweep configurations
 metaworld/             benchmark environments and assets
+metaworld/expert_policy/   scripted expert policies and their rollout script
 scripts/launch.py      runs a sweep configuration
 scripts/check_env.py   installation check
 ```

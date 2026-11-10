@@ -3,8 +3,8 @@ from __future__ import annotations
 import datetime as dt
 from pathlib import Path
 
-# Simulator the checked-out code trains on: 'gpu_warp' on the mujoco-warp branch (which has
-# mjwenv/), 'cpu' on main. Available to naming templates and logdir_root as {backend}, so runs
+# Simulator the checked-out code trains on: 'gpu_warp' on the main branch (which has
+# mjwenv/), 'cpu' on mujoco-cpu. Available to naming templates and logdir_root as {backend}, so runs
 # of the two versions never share a log directory, W&B run name or W&B group.
 BACKEND = "gpu_warp" if (Path(__file__).resolve().parents[1] / "mjwenv" / "__init__.py").is_file() else "cpu"
 

@@ -9,7 +9,7 @@ Run from the repository root:
 The environment is the one the baselines train on: gymnasium "Meta-World/MT1"
 with ProprioMultiImageObsWrapper (topview, front and gripperPOV cameras), each
 action repeated twice and at most 250 actions per episode, ending early on
-success. `--sim warp` uses the MuJoCo-Warp version instead (mujoco-warp branch
+success. `--sim warp` uses the MuJoCo-Warp version instead (main branch
 only). Rendering needs MUJOCO_GL (osmesa or egl), which the conda environment
 and the Docker image set.
 
@@ -55,7 +55,7 @@ def parse_args(argv=None):
     p.add_argument("--fps", type=int, default=20)
     p.add_argument("--npz", action="store_true", help="Save every episode as .npz.")
     p.add_argument("--sim", choices=("cpu", "warp"), default="cpu",
-                   help="cpu: MuJoCo (metaworld/); warp: MuJoCo-Warp (mjwenv/, mujoco-warp branch).")
+                   help="cpu: MuJoCo (metaworld/); warp: MuJoCo-Warp (mjwenv/, main branch).")
     p.add_argument("--out", type=Path, help="Output directory (default: outputs/expert_rollouts/<sim>).")
     args = p.parse_args(argv)
     args.tasks = [t.removeprefix("metaworld_") for t in args.tasks]
@@ -74,7 +74,7 @@ def make_env(task, args):
         except ModuleNotFoundError as e:
             if e.name != "mjwenv":
                 raise
-            raise SystemExit("--sim warp needs the mujoco-warp branch (mjwenv/)") from None
+            raise SystemExit("--sim warp needs the main branch (mjwenv/)") from None
         return MetaWorldWarpEnv(task, image_size=args.image_size, cameras=args.cameras,
                                 max_episode_steps=sim_steps, seed=args.seed)
     import gymnasium as gym

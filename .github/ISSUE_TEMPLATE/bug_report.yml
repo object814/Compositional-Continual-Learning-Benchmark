@@ -1,0 +1,57 @@
+name: Bug report
+description: Something fails to install, crashes, or behaves differently from the README.
+labels: [bug]
+body:
+  - type: dropdown
+    id: branch
+    attributes:
+      label: Branch
+      options:
+        - main (MuJoCo-Warp, GPU simulation)
+        - mujoco-cpu (CPU MuJoCo, as in the paper)
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installation
+      options:
+        - conda (environment.yml)
+        - Docker / Docker Compose
+        - other (describe below)
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System
+      description: OS, GPU model and NVIDIA driver version (`nvidia-smi` shows both).
+      placeholder: Ubuntu 22.04, RTX 4090, driver 550.54
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: Output of `git rev-parse --short HEAD`.
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, what happened instead, and the full error message or traceback.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: check-env
+    attributes:
+      label: Output of `python scripts/check_env.py`
+      render: text
