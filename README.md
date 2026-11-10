@@ -9,13 +9,15 @@
 Haoyu Zhou, Joe Watson, Anson Lei, Ingmar Posner<br>
 Applied Artificial Intelligence Lab (A2I), Oxford Robotics Institute, University of Oxford
 
-This branch (`mujoco-warp`) runs the benchmark with
+This branch (`main`, the default) runs the benchmark with
 [MuJoCo-Warp](https://github.com/google-deepmind/mujoco_warp): every task is
 simulated and rendered on the GPU instead of the CPU, so training is faster.
-Tasks, baselines, hyperparameters and commands are the same as on `main`.
+Tasks, baselines, hyperparameters and commands are the same as on the
+[`mujoco-cpu`](https://github.com/object814/Compositional-Continual-Learning-Benchmark/tree/mujoco-cpu) branch, which uses CPU MuJoCo as in the
+paper.
 
-**Use `main` to reproduce the paper.** This version follows the paper's tasks
-step for step, but GPU physics (float32) and the GPU renderer make training
+**Use `mujoco-cpu` to reproduce the paper exactly.** This version follows the
+paper's tasks step for step, but GPU physics (float32) and the GPU renderer make training
 dynamics differ slightly from the published results (see
 [Speed and consistency](#speed-and-consistency)).
 
@@ -44,7 +46,6 @@ Requires Linux with an NVIDIA GPU (driver supporting CUDA 12.4).
 ```bash
 git clone https://github.com/object814/Compositional-Continual-Learning-Benchmark.git
 cd Compositional-Continual-Learning-Benchmark
-git checkout mujoco-warp
 cp .env.example .env        # then set WANDB_API_KEY (or WANDB_MODE=offline)
 ```
 
@@ -100,12 +101,12 @@ recreate the container.
 
 ### Pretrained encoder
 
-Pretrained-encoder runs (TD-MPC2, PWM) load `checkpoints/encoder_ms19.pt`,
-which is distributed separately:
-
-```bash
-mkdir -p checkpoints && cp /path/to/encoder_ms19.pt checkpoints/
-```
+The pretrained-encoder runs (TD-MPC2, PWM) load
+[`checkpoints/encoder_ms19.pt`](checkpoints/encoder_ms19.pt), which comes with
+the repository. This CNN encoder was pretrained on demonstrations from all
+benchmark tasks and is kept frozen during training, so these runs have seen
+the full task distribution (the frozen-encoder diagnostic in the
+[paper](https://object814.github.io/Compositional-Continual-Learning/#experimental-setup)).
 
 ### Caches
 
@@ -181,7 +182,7 @@ obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
 ```
 
 `mjwenv.make_batched_env(task, num_envs=...)` simulates many worlds of one
-task in a single batch. The CPU version of the same tasks (as on `main`) is in
+task in a single batch. The CPU version of the same tasks (as on `mujoco-cpu`) is in
 `metaworld/`:
 
 ```python
@@ -246,7 +247,7 @@ Single-task baselines use `sweep_single.yaml` (TD-MPC2, DreamerV3) and
 `sweep_single_prism.yaml` (PWM). Logs go to
 `baselines/<baseline>/sweep/logdir/gpu_warp/`, and metrics to Weights & Biases
 as set in `.env`. W&B run names and groups start with `gpu_warp_` (`cpu_` on
-`main`), so runs of the two versions never share a log directory or a W&B run.
+`mujoco-cpu`), so runs of the two versions never share a log directory or a W&B run.
 
 **Resuming.** If a run stops, run the same command again (add
 `--rerun-failed` to skip finished runs). Each task's models, and what the
@@ -298,46 +299,19 @@ episodes, DreamerV3 every 10,000 steps over 10 episodes. The episode returns
 are logged to W&B as `eval/task<i>_<task>/episode_reward` (TD-MPC2, PWM) and
 `eval_task<i>_<task>/eval_return` (DreamerV3).
 
-**Normalisation.** Returns are expert-normalised:
-R = 100 · (return − f) / (R<sub>expert</sub> − f), where the floor f is the
-return of an episode that gets the worst reward at every simulator step
-(−500 for TD-MPC2 and PWM, −250 for DreamerV3), and R<sub>expert</sub> is the best of
-10 rollouts of a privileged, state-based scripted policy,
-listed in
+**Metrics.** Forward transfer (FWT↑: how much the earlier tasks help on the
+final composition task, compared with learning it from scratch) and backward
+transfer (BWT↓: forgetting of the earlier tasks) are defined in
+[Appendix A of the project page](https://object814.github.io/Compositional-Continual-Learning/#appendix-a). Both are computed on
+expert-normalised returns, R = 100 · (return − f) / (R<sub>expert</sub> − f),
+where the floor f is the return of an episode that gets the worst reward at
+every simulator step (−500 for TD-MPC2 and PWM, −250 for DreamerV3), and
+R<sub>expert</sub> is the best of 10 rollouts of a privileged, state-based
+scripted policy, listed in
 [`expert_return.txt`](baselines/pwm/tdmpc2/expert_reuse/expert_return.txt).
-So 0 is total failure and 100 matches the scripted policy; scores are not
-capped above. Curves are averaged over the three seeds before the metrics are
-computed, and integrals use the trapezoidal rule over the evaluation points.
-
-**Backward transfer (BWT↓, forgetting).** Let b<sub>i</sub> be the step at
-which training of task i ends, N the number of tasks, and
-C<sub>i</sub> = R<sub>i</sub>(b<sub>i</sub>) the task's score at that point.
-For every earlier task that was learnt (C<sub>i</sub> > 0), the drop below
-C<sub>i</sub> over the rest of the curriculum is expressed as a fraction of
-the largest possible drop:
-
-```
-D_i = 100 · ∫[b_i, b_N] max(0, C_i − R_i(s)) ds / ((b_N − b_i) · C_i)
-BWT = mean of D_i over the earlier tasks with C_i > 0
-```
-
-BWT lies in [0, 100]: 0 if no task ever drops below its end-of-training score,
-100 if every task collapses to the floor immediately. Tasks that were never
-learnt are left out. This is a forgetting score, not the higher-is-better
-backward transfer of Lopez-Paz and Ranzato (2017).
-
-**Forward transfer (FWT↑, reuse).** Measured on the final task only, against
-the same task learnt from scratch (the single-task sweeps):
-
-```
-FWT = (1/T) · ∫[0, T] (R_N^seq(t) − R_N^scratch(t)) dt
-```
-
-where R<sub>N</sub><sup>seq</sup> is the final task's curve within the
-curriculum (restarted at t = 0), R<sub>N</sub><sup>scratch</sup> the
-from-scratch curve, and T the training budget the two share. Positive values
-mean the curriculum helped. The from-scratch reference for each suite is this
-single-task configuration:
+So 0 is total failure and 100 matches the scripted policy. Curves are averaged
+over the three seeds before the metrics are computed. The from-scratch
+reference for FWT is this single-task configuration:
 
 | Suite | Final task | Single-task taskset (`sweep_single*.yaml`) |
 | --- | --- | --- |
@@ -350,7 +324,7 @@ single-task configuration:
 
 ## Reference results
 
-From the paper, run on `main` (CPU MuJoCo); means over three seeds. FT is
+From the paper, run on `mujoco-cpu` (CPU MuJoCo); means over three seeds. FT is
 sequential fine-tuning (`regular` in the sweep files). Runs on this branch
 should come close but will not match exactly (see
 [Speed and consistency](#speed-and-consistency)).
@@ -367,46 +341,9 @@ Averages over the six suites:
 | PWM | 79.21 | 2.41 | 3.85 | 36.18 |
 | TD-MPC2 (FT) | 75.91 | 7.57 | 34.97 | 38.11 |
 
-<details>
-<summary>Per-suite results</summary>
-
-**DreamerV3**
-
-| Suite | FT BWT↓ | FT FWT↑ | ER BWT↓ | ER FWT↑ | EWC BWT↓ | EWC FWT↑ | PackNet BWT↓ | PackNet FWT↑ |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `reach` | 11.77 | 43.91 | 5.68 | 49.42 | 7.22 | −2.25 | 0.67 | 36.95 |
-| `grasp` | 10.07 | 21.28 | 5.07 | 26.71 | 4.62 | −20.26 | 2.43 | 16.71 |
-| `binpnp` | 29.27 | 42.09 | 6.46 | 49.26 | 8.36 | 0.90 | 1.57 | 38.00 |
-| `pnpblock` | 31.80 | 11.64 | 11.80 | 36.37 | 4.36 | 8.74 | 0.71 | 9.20 |
-| `drawerpnp` | 56.15 | 7.06 | 21.90 | 35.52 | 13.92 | −1.65 | 0.20 | 13.45 |
-| `pnpboxclose` | 65.75 | 31.12 | 43.22 | 3.99 | 39.20 | 6.01 | 0.63 | 28.86 |
-
-**TD-MPC2**
-
-| Suite | FT BWT↓ | FT FWT↑ | ER BWT↓ | ER FWT↑ | EWC BWT↓ | EWC FWT↑ | PackNet BWT↓ | PackNet FWT↑ |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `reach` | 38.14 | 10.47 | 25.38 | 12.07 | 23.09 | 10.35 | 0.77 | 12.94 |
-| `grasp` | 62.62 | 27.17 | 46.70 | 24.74 | 51.54 | 17.27 | 8.98 | 19.04 |
-| `binpnp` | 77.16 | 10.50 | 44.61 | 19.69 | 64.46 | 5.18 | 3.84 | 9.73 |
-| `pnpblock` | 94.89 | 2.51 | 82.79 | 2.39 | 90.20 | −54.28 | 4.56 | −10.73 |
-| `drawerpnp` | 89.59 | 1.07 | 88.51 | 1.81 | 91.65 | −3.53 | 4.10 | −0.17 |
-| `pnpboxclose` | 93.07 | −6.27 | 85.48 | 3.19 | 90.16 | 3.21 | 6.90 | 13.04 |
-
-**PWM and TD-MPC2 (FT) by encoder**
-
-| Suite | PWM scratch BWT↓ | PWM scratch FWT↑ | TD-MPC2 scratch BWT↓ | TD-MPC2 scratch FWT↑ | PWM frozen BWT↓ | PWM frozen FWT↑ | TD-MPC2 frozen BWT↓ | TD-MPC2 frozen FWT↑ |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `reach` | 44.45 | 9.35 | 38.14 | 10.47 | 2.47 | 5.84 | 35.07 | 10.64 |
-| `grasp` | 90.73 | 14.49 | 62.62 | 27.17 | 5.69 | 48.29 | 13.80 | 49.44 |
-| `binpnp` | 66.97 | 1.88 | 77.16 | 10.50 | 6.65 | 34.30 | 10.27 | 37.50 |
-| `pnpblock` | 92.36 | −3.21 | 94.89 | 2.51 | 3.99 | 50.02 | 45.36 | 58.38 |
-| `drawerpnp` | 90.81 | 2.01 | 89.59 | 1.07 | 1.64 | 41.02 | 59.06 | 40.22 |
-| `pnpboxclose` | 89.95 | −10.09 | 93.07 | −6.27 | 2.68 | 37.62 | 46.24 | 32.51 |
-
-Learning curves for every suite and method are on the
-[project page](https://object814.github.io/Compositional-Continual-Learning/).
-
-</details>
+Per-suite scores are in [Appendix B](https://object814.github.io/Compositional-Continual-Learning/#appendix-b) of the project page,
+and the learning curves for every suite and method in
+[Appendix C](https://object814.github.io/Compositional-Continual-Learning/#appendix-c).
 
 ## Compute requirements
 
@@ -432,7 +369,7 @@ branch.
 
 ## Speed and consistency
 
-Measured against `main` with the same tasks, seeds and settings, the two
+Measured against `mujoco-cpu` with the same tasks, seeds and settings, the two
 versions running side by side on the same GPU:
 
 | | Training speed-up |
@@ -440,7 +377,7 @@ versions running side by side on the same GPU:
 | TD-MPC2 | about 2.7× |
 | DreamerV3 | about 1.3× (most of its time is spent on gradient updates) |
 
-**What is the same as `main`:** task layouts, resets, observations, rewards,
+**What is the same as `mujoco-cpu`:** task layouts, resets, observations, rewards,
 success tests, episode length, and every training script, wrapper and
 hyperparameter. Given the same simulator state, the GPU tasks return the same
 observations (to about 1e-6), the same success flags and the same rewards (to
