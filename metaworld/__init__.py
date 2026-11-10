@@ -333,6 +333,9 @@ def register_mw_envs() -> None:
             **kwargs,
         ),
         kwargs={},
+        # The checker only warns (Meta-World's spaces have fixed padding entries
+        # and observations outside their bounds); it never changes an episode.
+        disable_env_checker=True,
     )
 
 

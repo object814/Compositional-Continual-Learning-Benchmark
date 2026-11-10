@@ -1,7 +1,20 @@
-# Compositional Continual Learning Benchmark
+# Benchmarking World Models for Continual Learning on Compositional Tasks
 
-Meta-World manipulation tasks arranged into curricula, where later tasks
-compose skills from earlier ones, with three model-based baselines:
+[Project page](https://object814.github.io/Compositional-Continual-Learning/) ·
+[Paper (arXiv)](https://arxiv.org/abs/2609.22055) ·
+[Citation](#citation)
+
+Haoyu Zhou, Joe Watson, Anson Lei, Ingmar Posner<br>
+Applied Artificial Intelligence Lab (A2I), Oxford Robotics Institute, University of Oxford
+
+![Overview of the benchmark](https://object814.github.io/Compositional-Continual-Learning/static/images/teaser_figure.png)
+
+The benchmark arranges Meta-World manipulation tasks into curricula that end
+with a composition task built from the primitives before it. Forward transfer
+on that final task measures how well a world model reuses what it learnt;
+evaluating the earlier tasks as training goes on measures forgetting. The
+compositions vary what the robot does (action), what it sees (perception), or
+both. Three model-based baselines are included:
 
 | Baseline | Methods |
 | --- | --- |
@@ -11,6 +24,14 @@ compose skills from earlier ones, with three model-based baselines:
 
 TD-MPC2 and PWM train their CNN encoder from scratch or start from a
 pretrained, frozen encoder.
+
+**Faster GPU version.** The
+[`mujoco-warp`](https://github.com/object814/Compositional-Continual-Learning-Benchmark/tree/mujoco-warp)
+branch runs the same tasks, baselines and commands with
+[MuJoCo-Warp](https://github.com/google-deepmind/mujoco_warp), simulating and
+rendering every task on the GPU: training is about 2.7× faster for TD-MPC2 and
+1.3× faster for DreamerV3. Its float32 physics and GPU renderer change training
+dynamics slightly, so use this branch (`main`) to reproduce the paper.
 
 ## Installation
 
@@ -93,6 +114,63 @@ benchmark tasks. `--smoke` trains for 3,000 steps per task and keeps no
 output. With several GPUs, select one first, for example
 `export CUDA_VISIBLE_DEVICES=1`.
 
+## The benchmark
+
+Six task suites (`--taskset`), each trained in order. The last task of every
+suite composes the ones before it.
+
+| Suite | Composition | Primitive tasks, in order | Composition task |
+| --- | --- | --- | --- |
+| `reach` | action | `reach-xy`, `reach-xz`, `reach-yz`: move the gripper to a target in one plane | `reach-xyz`: reach a target anywhere in 3D |
+| `grasp` | action | `reach`: move the gripper to a target, with the cube on the table; `grasp`: pick up the cube | `pick-place`: pick up the cube and place it at a target |
+| `binpnp` | perception | `bin-picking-redblue`, `-yellowblue`, `-redpurple`: move the cube from the first bin to the second (bins coloured as named) | `bin-picking-yellowpurple`: the same, from the yellow bin to the purple bin |
+| `pnpblock` | perception | `pick-place-redblock`, `pick-place-greenblock`: place one block at a target | `compo-pickplace-block`: place the red block, then stack the green block on it |
+| `drawerpnp` | full | `drawer-open`; `pick-place`: place the cube at a target | `compo-draweropen-pickplace`: open the drawer, then place the cube inside |
+| `pnpboxclose` | full | `pick-place-redblock`; `box-close`: put the lid on the box | `compo-pickplace-boxclose`: place the block inside the box, then close the lid |
+
+Task names are Meta-World environment names; all but the composition tasks
+end in `-v3` (for example `reach-xy-v3`).
+
+**Observations.** A dictionary with
+
+- `proprio` (7, float32): gripper position (3), gripper velocity (3) and
+  gripper opening (1);
+- `image` (128 × 128 × 9, uint8): RGB images from the `topview`, `front` and
+  `gripperPOV` cameras, stacked along the channel axis;
+- `original_obs` (39): Meta-World's state vector (gripper, object
+  poses, previous frame, goal). It is privileged information, and the baselines
+  do not use it.
+
+**Actions.** 4 numbers in [-1, 1]: the end-effector displacement in x, y, z and
+the gripper command.
+
+**Rewards and episodes.** The environment returns a dense reward in [-1, 1] per
+step; the training scripts rescale it to [-1, 0] as (r - 1) / 2. An episode
+terminates when the task succeeds (`info['success']`) and is truncated after
+`max_episode_steps`.
+
+### Using the environments
+
+From the repository root, after activating the environment (it sets
+`MUJOCO_GL=osmesa` for offscreen rendering):
+
+```python
+import gymnasium as gym
+import metaworld  # registers Meta-World/MT1
+from metaworld.wrappers import ProprioMultiImageObsWrapper
+
+env = gym.make("Meta-World/MT1", env_name="compo-pickplace-block",
+               render_mode="rgb_array", max_episode_steps=500)
+env = ProprioMultiImageObsWrapper(env, image_height=128, image_width=128,
+                                  camera_names=["topview", "front", "gripperPOV"])
+obs, info = env.reset(seed=0)
+obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
+```
+
+On the `mujoco-warp` branch, `mjwenv.MetaWorldWarpEnv` provides the same tasks
+with the same interface on the GPU, and `mjwenv.make_batched_env` simulates
+many worlds of one task in a single batch.
+
 ## Repository layout
 
 ```
@@ -132,7 +210,7 @@ Useful options:
 | Option | Effect |
 | --- | --- |
 | `--dry-run` | print the commands without running them |
-| `--taskset grasp,reach` | only these curricula |
+| `--taskset grasp,reach` | only these curricula (see [The benchmark](#the-benchmark)) |
 | `--seeds 0` | only these seeds |
 | `--method er,ewc` | only these methods (DreamerV3 `sweep_sequential.yaml`) |
 | `--encoder scratch` or `pretrained` | only this encoder variant (TD-MPC2, PWM) |
@@ -160,16 +238,186 @@ A finished run is never overwritten: without `--rerun-failed`, running it
 again trains a new copy in `<logdir>_<timestamp>`, logged to Weights & Biases
 as `<run name>_<timestamp>`.
 
-Curricula (`--taskset`), trained in order:
+## Evaluation protocol
 
-| Taskset | Tasks |
-| --- | --- |
-| `reach` | reach-xy → reach-xz → reach-yz → reach-xyz |
-| `grasp` | reach → grasp → pick-place |
-| `binpnp` | bin-picking-redblue → bin-picking-yellowblue → bin-picking-redpurple → bin-picking-yellowpurple |
-| `drawerpnp` | drawer-open → pick-place → compo-draweropen-pickplace |
-| `pnpblock` | pick-place-redblock → pick-place-greenblock → compo-pickplace-block |
-| `pnpboxclose` | pick-place-redblock → box-close → compo-pickplace-boxclose |
+To compare a new method with the results below, keep the following fixed.
+
+**Training.** Each suite is trained in order, with the per-task budgets below
+and seeds 0, 1 and 2. Every task starts with a fresh replay buffer, so only
+what the method itself carries over (weights, ER episodes, EWC Fisher
+information, PackNet masks) crosses a task boundary. A shared backbone
+(encoder, dynamics model and decoder, if any) learns across all tasks; each
+task gets its own reward, actor and critic heads, which are frozen when the
+task ends. Earlier tasks are evaluated with their stored heads and the current
+backbone.
+
+Budgets per task, in millions of steps, in curriculum order:
+
+| Suite | TD-MPC2, PWM | DreamerV3 |
+| --- | --- | --- |
+| `reach` | 0.2, 0.2, 0.2, 0.2 | 0.4, 0.4, 0.4, 0.5 |
+| `grasp` | 0.2, 0.6, 0.5 | 0.2, 0.4, 0.6 |
+| `binpnp` | 0.8, 0.8, 0.8, 0.8 | 0.7, 0.5, 0.5, 0.5 |
+| `pnpblock` | 0.8, 0.8, 1.8 | 0.8, 0.5, 0.8 |
+| `drawerpnp` | 0.1, 0.5, 1.8 | 0.2, 0.5, 1.0 |
+| `pnpboxclose` | 0.8, 0.6, 1.8 | 0.8, 0.5, 0.8 |
+
+TD-MPC2 and PWM count agent steps: each action is repeated twice, and an
+episode lasts 250 agent steps (500 simulator steps). DreamerV3 repeats no
+actions, and its episodes last 250 steps. The sweep files in
+`baselines/<baseline>/sweep/` hold these budgets and every other setting.
+
+**Evaluation.** During sequential training, every task seen so far is
+evaluated at a fixed interval: TD-MPC2 and PWM every 5,000 steps over 5
+episodes, DreamerV3 every 10,000 steps over 10 episodes. The episode returns
+are logged to W&B as `eval/task<i>_<task>/episode_reward` (TD-MPC2, PWM) and
+`eval_task<i>_<task>/eval_return` (DreamerV3).
+
+**Normalisation.** Returns are expert-normalised:
+R = 100 · (return − f) / (R<sub>expert</sub> − f), where the floor f is the
+return of an episode that gets the worst reward at every simulator step
+(−500 for TD-MPC2 and PWM, −250 for DreamerV3), and R<sub>expert</sub> is the best of
+10 rollouts of a privileged, state-based scripted policy,
+listed in
+[`expert_return.txt`](baselines/pwm/tdmpc2/expert_reuse/expert_return.txt).
+So 0 is total failure and 100 matches the scripted policy; scores are not
+capped above. Curves are averaged over the three seeds before the metrics are
+computed, and integrals use the trapezoidal rule over the evaluation points.
+
+**Backward transfer (BWT↓, forgetting).** Let b<sub>i</sub> be the step at
+which training of task i ends, N the number of tasks, and
+C<sub>i</sub> = R<sub>i</sub>(b<sub>i</sub>) the task's score at that point.
+For every earlier task that was learnt (C<sub>i</sub> > 0), the drop below
+C<sub>i</sub> over the rest of the curriculum is expressed as a fraction of
+the largest possible drop:
+
+```
+D_i = 100 · ∫[b_i, b_N] max(0, C_i − R_i(s)) ds / ((b_N − b_i) · C_i)
+BWT = mean of D_i over the earlier tasks with C_i > 0
+```
+
+BWT lies in [0, 100]: 0 if no task ever drops below its end-of-training score,
+100 if every task collapses to the floor immediately. Tasks that were never
+learnt are left out. This is a forgetting score, not the higher-is-better
+backward transfer of Lopez-Paz and Ranzato (2017).
+
+**Forward transfer (FWT↑, reuse).** Measured on the final task only, against
+the same task learnt from scratch (the single-task sweeps):
+
+```
+FWT = (1/T) · ∫[0, T] (R_N^seq(t) − R_N^scratch(t)) dt
+```
+
+where R<sub>N</sub><sup>seq</sup> is the final task's curve within the
+curriculum (restarted at t = 0), R<sub>N</sub><sup>scratch</sup> the
+from-scratch curve, and T the training budget the two share. Positive values
+mean the curriculum helped. The from-scratch reference for each suite is this
+single-task configuration:
+
+| Suite | Final task | Single-task taskset (`sweep_single*.yaml`) |
+| --- | --- | --- |
+| `reach` | reach-xyz | `reach_xyz` |
+| `grasp` | pick-place | `pnpcube` |
+| `binpnp` | bin-picking-yellowpurple | `binpnp` |
+| `pnpblock` | compo-pickplace-block | `compo_pnpblock` |
+| `drawerpnp` | compo-draweropen-pickplace | `compo_drawerpnp` |
+| `pnpboxclose` | compo-pickplace-boxclose | `compo_pnpboxclose` |
+
+## Reference results
+
+From the paper, run with this branch; means over three seeds. FT is
+sequential fine-tuning (`regular` in the sweep files).
+
+Averages over the six suites:
+
+| | FT BWT↓ | FT FWT↑ | ER BWT↓ | ER FWT↑ | EWC BWT↓ | EWC FWT↑ | PackNet BWT↓ | PackNet FWT↑ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DreamerV3 | 34.14 | 26.18 | 15.69 | 33.55 | 12.95 | −1.42 | 1.04 | 23.86 |
+| TD-MPC2 | 75.91 | 7.57 | 62.25 | 10.65 | 68.52 | −3.63 | 4.86 | 7.31 |
+
+| | Scratch encoder BWT↓ | Scratch encoder FWT↑ | Pretrained frozen encoder BWT↓ | Pretrained frozen encoder FWT↑ |
+| --- | --- | --- | --- | --- |
+| PWM | 79.21 | 2.41 | 3.85 | 36.18 |
+| TD-MPC2 (FT) | 75.91 | 7.57 | 34.97 | 38.11 |
+
+<details>
+<summary>Per-suite results</summary>
+
+**DreamerV3**
+
+| Suite | FT BWT↓ | FT FWT↑ | ER BWT↓ | ER FWT↑ | EWC BWT↓ | EWC FWT↑ | PackNet BWT↓ | PackNet FWT↑ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `reach` | 11.77 | 43.91 | 5.68 | 49.42 | 7.22 | −2.25 | 0.67 | 36.95 |
+| `grasp` | 10.07 | 21.28 | 5.07 | 26.71 | 4.62 | −20.26 | 2.43 | 16.71 |
+| `binpnp` | 29.27 | 42.09 | 6.46 | 49.26 | 8.36 | 0.90 | 1.57 | 38.00 |
+| `pnpblock` | 31.80 | 11.64 | 11.80 | 36.37 | 4.36 | 8.74 | 0.71 | 9.20 |
+| `drawerpnp` | 56.15 | 7.06 | 21.90 | 35.52 | 13.92 | −1.65 | 0.20 | 13.45 |
+| `pnpboxclose` | 65.75 | 31.12 | 43.22 | 3.99 | 39.20 | 6.01 | 0.63 | 28.86 |
+
+**TD-MPC2**
+
+| Suite | FT BWT↓ | FT FWT↑ | ER BWT↓ | ER FWT↑ | EWC BWT↓ | EWC FWT↑ | PackNet BWT↓ | PackNet FWT↑ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `reach` | 38.14 | 10.47 | 25.38 | 12.07 | 23.09 | 10.35 | 0.77 | 12.94 |
+| `grasp` | 62.62 | 27.17 | 46.70 | 24.74 | 51.54 | 17.27 | 8.98 | 19.04 |
+| `binpnp` | 77.16 | 10.50 | 44.61 | 19.69 | 64.46 | 5.18 | 3.84 | 9.73 |
+| `pnpblock` | 94.89 | 2.51 | 82.79 | 2.39 | 90.20 | −54.28 | 4.56 | −10.73 |
+| `drawerpnp` | 89.59 | 1.07 | 88.51 | 1.81 | 91.65 | −3.53 | 4.10 | −0.17 |
+| `pnpboxclose` | 93.07 | −6.27 | 85.48 | 3.19 | 90.16 | 3.21 | 6.90 | 13.04 |
+
+**PWM and TD-MPC2 (FT) by encoder**
+
+| Suite | PWM scratch BWT↓ | PWM scratch FWT↑ | TD-MPC2 scratch BWT↓ | TD-MPC2 scratch FWT↑ | PWM frozen BWT↓ | PWM frozen FWT↑ | TD-MPC2 frozen BWT↓ | TD-MPC2 frozen FWT↑ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `reach` | 44.45 | 9.35 | 38.14 | 10.47 | 2.47 | 5.84 | 35.07 | 10.64 |
+| `grasp` | 90.73 | 14.49 | 62.62 | 27.17 | 5.69 | 48.29 | 13.80 | 49.44 |
+| `binpnp` | 66.97 | 1.88 | 77.16 | 10.50 | 6.65 | 34.30 | 10.27 | 37.50 |
+| `pnpblock` | 92.36 | −3.21 | 94.89 | 2.51 | 3.99 | 50.02 | 45.36 | 58.38 |
+| `drawerpnp` | 90.81 | 2.01 | 89.59 | 1.07 | 1.64 | 41.02 | 59.06 | 40.22 |
+| `pnpboxclose` | 89.95 | −10.09 | 93.07 | −6.27 | 2.68 | 37.62 | 46.24 | 32.51 |
+
+Learning curves for every suite and method are on the
+[project page](https://object814.github.io/Compositional-Continual-Learning/).
+
+</details>
+
+## Compute requirements
+
+Each run uses one GPU, and the simulation runs on the CPU. Our runs used one
+NVIDIA L40S (48 GB) and 64 GB of RAM each. The hours below are estimates for
+one curriculum with one seed. They are derived from speeds measured on the
+`mujoco-warp` branch and its measured speed-up over `main` (2.7× for TD-MPC2,
+1.3× for DreamerV3), giving about 19,000 steps per hour for TD-MPC2 and 34,000
+for DreamerV3. PWM's speed on `main` was not measured; its estimate of about
+15,000 steps per hour assumes the same simulation cost per step as TD-MPC2.
+Sequential runs also evaluate every earlier task, so allow ±30%.
+
+| Suite | TD-MPC2 | PWM | DreamerV3 |
+| --- | --- | --- | --- |
+| `reach` | 42 h | 54 h | 50 h |
+| `grasp` | 68 h | 88 h | 35 h |
+| `binpnp` | 166 h | 217 h | 65 h |
+| `pnpblock` | 177 h | 230 h | 62 h |
+| `drawerpnp` | 125 h | 163 h | 50 h |
+| `pnpboxclose` | 166 h | 217 h | 62 h |
+| all six | 743 h | 969 h | 325 h |
+
+Running every configuration in the sweep files (all methods, encoder variants
+and seeds, plus the single-task runs) takes about 28,000 GPU-hours on `main`,
+and about 13,500 on the `mujoco-warp` branch.
+
+## Citation
+
+If you use this benchmark or code, please cite:
+
+```bibtex
+@article{zhou2026benchmarking,
+  title={Benchmarking World Models for Continual Learning on Compositional Tasks},
+  author={Zhou, Haoyu and Watson, Joe and Lei, Anson and Posner, Ingmar},
+  journal={arXiv preprint arXiv:2609.22055},
+  year={2026}
+}
+```
 
 ## License
 
