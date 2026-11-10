@@ -5,12 +5,13 @@ __pycache__/
 
 # Training outputs and checkpoints
 baselines/*/sweep/logdir/
-checkpoints/
+checkpoints/*
 wandb/
 outputs/
 multirun/
 *.pt
 *.pth
+!checkpoints/encoder_ms19.pt
 
 # Local state: conda envs, caches (see metaworld/workspace.py), W&B settings
 .conda/
