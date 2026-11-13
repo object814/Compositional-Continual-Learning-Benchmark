@@ -366,3 +366,8 @@ the environments, please also cite Meta-World:
   url={https://openreview.net/forum?id=1de3azE606}
 }
 ```
+
+## AI assistance
+
+We used AI assistants (Claude and ChatGPT) to help refactor and document this
+codebase for its open-source release.
