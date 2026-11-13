@@ -1,15 +1,16 @@
 # Benchmarking World Models for Continual Learning on Compositional Tasks
 
 [Project page](https://object814.github.io/Compositional-Continual-Learning/) ·
-[Paper (arXiv)](https://arxiv.org/abs/2609.22055) ·
-[Citation](#citation)
+[Paper (arXiv)](https://arxiv.org/abs/2609.22055)
 
 ### MuJoCo CPU version
 
 Haoyu Zhou, Joe Watson, Anson Lei, Ingmar Posner<br>
 Applied Artificial Intelligence Lab (A2I), Oxford Robotics Institute, University of Oxford
 
-![Overview of the benchmark](https://object814.github.io/Compositional-Continual-Learning/static/images/teaser_figure.png)
+<p align="center">
+  <img src="https://object814.github.io/Compositional-Continual-Learning/static/images/teaser_figure.png" alt="Overview of the benchmark" width="50%">
+</p>
 
 The benchmark arranges Meta-World manipulation tasks into curricula that end
 with a composition task built from the primitives before it. Forward transfer
@@ -300,27 +301,12 @@ paper and in [Appendix B](https://object814.github.io/Compositional-Continual-Le
 ## Compute requirements
 
 Each run uses one GPU, and the simulation runs on the CPU. Our runs used one
-NVIDIA L40S (48 GB) and 64 GB of RAM each. The hours below are estimates for
-one curriculum with one seed. They are derived from the speeds of our
-sequential runs on the `main` branch (MuJoCo-Warp) and its measured speed-up
-over this branch (2.7× for TD-MPC2, 1.3× for DreamerV3), giving about 14,000
+NVIDIA L40S (48 GB) and 64 GB of RAM each. Training speed on this branch, estimated
+from our sequential runs on `main` (MuJoCo-Warp) and its measured speed-up
+over this branch (2.7× for TD-MPC2, 1.3× for DreamerV3), is about 14,000
 steps per hour for TD-MPC2 and 45,000 for DreamerV3. PWM's speed on this
-branch was not measured; its estimate of about 12,000 steps per hour assumes
-the same simulation cost per step as TD-MPC2. Allow ±30%.
-
-| Suite | TD-MPC2 | PWM | DreamerV3 |
-| --- | --- | --- | --- |
-| `reach` | 57 h | 69 h | 18 h |
-| `grasp` | 99 h | 121 h | 31 h |
-| `binpnp` | 227 h | 276 h | 72 h |
-| `pnpblock` | 242 h | 294 h | 76 h |
-| `drawerpnp` | 178 h | 216 h | 56 h |
-| `pnpboxclose` | 227 h | 276 h | 72 h |
-| all six | 1,030 h | 1,252 h | 325 h |
-
-Running every configuration in the sweep files (all methods, encoder variants
-and seeds, plus the single-task runs) takes about 35,000 GPU-hours on this
-branch, and about 16,000 on `main` (MuJoCo-Warp).
+branch was not measured; assuming the same simulation cost per step as
+TD-MPC2 gives about 12,000.
 
 **Smaller models.** We did not sweep model sizes: every run uses TD-MPC2's
 19M-parameter model (PWM builds on it) and DreamerV3's 200M configuration.
@@ -330,19 +316,6 @@ the pretrained encoder fits size 19 only). For DreamerV3, reduce `dyn_hidden`,
 `dyn_deter`, `units` and the encoder and decoder `cnn_depth` and `mlp_units`
 of `metaworld_visual_200M_heavy_long_speedup` in
 `baselines/dreamerv3/configs.yaml`.
-
-## Citation
-
-If you use this benchmark or code, please cite:
-
-```bibtex
-@article{zhou2026benchmarking,
-  title={Benchmarking World Models for Continual Learning on Compositional Tasks},
-  author={Zhou, Haoyu and Watson, Joe and Lei, Anson and Posner, Ingmar},
-  journal={arXiv preprint arXiv:2609.22055},
-  year={2026}
-}
-```
 
 ## License
 
