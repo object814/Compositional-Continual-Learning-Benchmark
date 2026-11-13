@@ -61,13 +61,13 @@ methods:
         configs:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
-        - 700000
+        - 800000
         dataset_sizes_divisor: 8
       boxclose:
         configs:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
-        - 500000
+        - 600000
         dataset_sizes_divisor: 8
       draweropen:
         configs:
@@ -79,7 +79,7 @@ methods:
         configs:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
-        - 500000
+        - 600000
         dataset_sizes_divisor: 8
       pnpblock:
         configs:
@@ -97,13 +97,13 @@ methods:
         configs:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
-        - 400000
+        - 200000
         dataset_sizes_divisor: 8
       reach_xyz:
         configs:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
-        - 1400000
+        - 200000
         dataset_sizes_divisor: 8
       compo_drawerpnp:
         configs:

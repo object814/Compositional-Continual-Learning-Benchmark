@@ -56,8 +56,8 @@ tasksets:
     model_size: 19
   pnpcube:
     task: metaworld_pick-place-v3
-    steps: 500000
-    buffer_size: 125000
+    steps: 600000
+    buffer_size: 150000
     model_size: 19
   reach_xy:
     task: metaworld_reach-xy-v3
@@ -76,7 +76,7 @@ tasksets:
     model_size: 19
   compo_pnpblock:
     task: metaworld_compo-pickplace-block
-    steps: 1500000
+    steps: 1800000
     buffer_size: 180000
     model_size: 19
   compo_pnpboxclose:

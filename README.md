@@ -205,23 +205,54 @@ Each experiment is a YAML file in `baselines/<baseline>/sweep/`.
 `scripts/launch.py` expands it into runs (tasksets × seeds × encoder
 variants) and runs them one after another.
 
-## Sequential training
+## Training
 
-By default each command runs every curriculum with seeds 0, 1 and 2 (and,
-for TD-MPC2/PWM, each encoder variant listed in the configuration).
+Every experiment is a sweep file in `baselines/<baseline>/sweep/`, started
+with `python scripts/launch.py <baseline> <sweep file>`. A sweep file runs all
+its curricula (or single tasks) with seeds 0, 1 and 2, one run after another;
+the options further down select part of it.
+
+**Continual-learning runs**, one command per configuration:
 
 ```bash
-# TD-MPC2
-python scripts/launch.py tdmpc2 sweep_sequential_regular.yaml   # fine-tuning
+# TD-MPC2: fine-tuning (FT), with the CNN encoder trained from scratch or pretrained and frozen
+python scripts/launch.py tdmpc2 sweep_sequential_regular.yaml --encoder scratch
+python scripts/launch.py tdmpc2 sweep_sequential_regular.yaml --encoder pretrained
+# TD-MPC2: experience replay (ER), EWC and PackNet
 python scripts/launch.py tdmpc2 sweep_sequential_er.yaml
 python scripts/launch.py tdmpc2 sweep_sequential_ewc.yaml
 python scripts/launch.py tdmpc2 sweep_sequential_packnet.yaml
 
-# PWM
-python scripts/launch.py pwm sweep_prismatic_seq_progressive.yaml
+# PWM: progressive mixture of experts, encoder from scratch or pretrained and frozen
+python scripts/launch.py pwm sweep_prismatic_seq_progressive.yaml --encoder scratch
+python scripts/launch.py pwm sweep_prismatic_seq_progressive.yaml --encoder pretrained
 
-# DreamerV3 (fine-tuning, ER, EWC and PackNet)
-python scripts/launch.py dreamerv3 sweep_sequential.yaml
+# DreamerV3: FT, ER, EWC and PackNet
+python scripts/launch.py dreamerv3 sweep_sequential.yaml --method regular
+python scripts/launch.py dreamerv3 sweep_sequential.yaml --method er
+python scripts/launch.py dreamerv3 sweep_sequential.yaml --method ewc
+python scripts/launch.py dreamerv3 sweep_sequential.yaml --method packnet
+```
+
+Without `--encoder` or `--method`, a command runs every variant in its file.
+
+**Single-task runs**, which are also the from-scratch references for forward
+transfer:
+
+```bash
+python scripts/launch.py tdmpc2 sweep_single.yaml --encoder scratch       # or pretrained
+python scripts/launch.py pwm sweep_single_prism.yaml --encoder scratch    # or pretrained
+python scripts/launch.py dreamerv3 sweep_single.yaml
+```
+
+Their tasksets are `reach_xy`, `reach_xyz`, `draweropen`, `graspcube`,
+`pnpcube`, `pnpblock`, `boxclose`, `binpnp`, `compo_drawerpnp`,
+`compo_pnpblock` and `compo_pnpboxclose`.
+
+For example, one TD-MPC2 EWC run on the `grasp` suite with seed 0:
+
+```bash
+python scripts/launch.py tdmpc2 sweep_sequential_ewc.yaml --taskset grasp --seeds 0
 ```
 
 Useful options:
@@ -229,14 +260,13 @@ Useful options:
 | Option | Effect |
 | --- | --- |
 | `--dry-run` | print the commands without running them |
-| `--taskset grasp,reach` | only these curricula (see [The benchmark](#the-benchmark)) |
+| `--taskset grasp,reach` | only these curricula (see [The benchmark](#the-benchmark)) or single-task tasksets |
 | `--seeds 0` | only these seeds |
-| `--method er,ewc` | only these methods (DreamerV3 `sweep_sequential.yaml`) |
+| `--method er,ewc` | only these methods (DreamerV3: `regular`, `er`, `ewc`, `packnet`) |
 | `--encoder scratch` or `pretrained` | only this encoder variant (TD-MPC2, PWM) |
 | `--rerun-failed` | skip runs that already finished |
 
-Single-task baselines use `sweep_single.yaml` (TD-MPC2, DreamerV3) and
-`sweep_single_prism.yaml` (PWM). Logs go to
+Logs go to
 `baselines/<baseline>/sweep/logdir/cpu/`, and metrics to Weights & Biases as
 set in `.env`. W&B run names and groups start with `cpu_` (`gpu_warp_` on the
 `main` branch), so runs of the two versions never share a log directory
@@ -270,7 +300,28 @@ task gets its own reward, actor and critic heads, which are frozen when the
 task ends. Earlier tasks are evaluated with their stored heads and the current
 backbone.
 
-Budgets per task, in millions of steps, in curriculum order:
+Budgets per task, in millions of steps, in curriculum order. They are the
+same for every baseline:
+
+| Suite | Budget per task |
+| --- | --- |
+| `reach` | 0.2, 0.2, 0.2, 0.2 |
+| `grasp` | 0.2, 0.6, 0.6 |
+| `binpnp` | 0.8, 0.8, 0.8, 0.8 |
+| `pnpblock` | 0.8, 0.8, 1.8 |
+| `drawerpnp` | 0.2, 0.5, 1.8 |
+| `pnpboxclose` | 0.8, 0.6, 1.8 |
+
+TD-MPC2 and PWM count agent steps: each action is repeated twice, and an
+episode lasts 250 agent steps (500 simulator steps). DreamerV3 repeats no
+actions, and its episodes last 250 steps. The sweep files in
+`baselines/<baseline>/sweep/` hold these budgets and every other setting.
+
+<details>
+<summary>Budgets of the paper's runs</summary>
+
+The [reference results](#reference-results) come from runs with per-baseline
+budgets, in millions of steps:
 
 | Suite | TD-MPC2, PWM | DreamerV3 |
 | --- | --- | --- |
@@ -281,10 +332,10 @@ Budgets per task, in millions of steps, in curriculum order:
 | `drawerpnp` | 0.1, 0.5, 1.8 | 0.2, 0.5, 1.0 |
 | `pnpboxclose` | 0.8, 0.6, 1.8 | 0.8, 0.5, 0.8 |
 
-TD-MPC2 and PWM count agent steps: each action is repeated twice, and an
-episode lasts 250 agent steps (500 simulator steps). DreamerV3 repeats no
-actions, and its episodes last 250 steps. The sweep files in
-`baselines/<baseline>/sweep/` hold these budgets and every other setting.
+The single-task budgets differed between baselines too. The sweep files at
+commit `7cd687d` of the `mujoco-cpu` branch hold all of the paper's budgets.
+
+</details>
 
 **Evaluation.** During sequential training, every task seen so far is
 evaluated at a fixed interval: TD-MPC2 and PWM every 5,000 steps over 5
@@ -306,19 +357,20 @@ So 0 is total failure and 100 matches the scripted policy. Curves are averaged
 over the three seeds before the metrics are computed. The from-scratch
 reference for FWT is this single-task configuration:
 
-| Suite | Final task | Single-task taskset (`sweep_single*.yaml`) |
-| --- | --- | --- |
-| `reach` | reach-xyz | `reach_xyz` |
-| `grasp` | pick-place | `pnpcube` |
-| `binpnp` | bin-picking-yellowpurple | `binpnp` |
-| `pnpblock` | compo-pickplace-block | `compo_pnpblock` |
-| `drawerpnp` | compo-draweropen-pickplace | `compo_drawerpnp` |
-| `pnpboxclose` | compo-pickplace-boxclose | `compo_pnpboxclose` |
+| Suite | Final task | Single-task taskset (`sweep_single*.yaml`) | Budget (M steps) |
+| --- | --- | --- | --- |
+| `reach` | reach-xyz | `reach_xyz` | 0.2 |
+| `grasp` | pick-place | `pnpcube` | 0.6 |
+| `binpnp` | bin-picking-yellowpurple | `binpnp` | 0.8 |
+| `pnpblock` | compo-pickplace-block | `compo_pnpblock` | 1.8 |
+| `drawerpnp` | compo-draweropen-pickplace | `compo_drawerpnp` | 1.5 |
+| `pnpboxclose` | compo-pickplace-boxclose | `compo_pnpboxclose` | 1.5 |
 
 ## Reference results
 
 From the paper, run with this branch; means over three seeds. FT is
-sequential fine-tuning (`regular` in the sweep files).
+sequential fine-tuning (`regular` in the sweep files). These runs used the
+paper's per-baseline budgets (see [Evaluation protocol](#evaluation-protocol)).
 
 Averages over the six suites:
 
@@ -340,26 +392,26 @@ and the learning curves for every suite and method in
 
 Each run uses one GPU, and the simulation runs on the CPU. Our runs used one
 NVIDIA L40S (48 GB) and 64 GB of RAM each. The hours below are estimates for
-one curriculum with one seed. They are derived from speeds measured on the
-`main` branch (MuJoCo-Warp) and its measured speed-up over this branch (2.7× for TD-MPC2,
-1.3× for DreamerV3), giving about 19,000 steps per hour for TD-MPC2 and 34,000
-for DreamerV3. PWM's speed on this branch was not measured; its estimate of about
-15,000 steps per hour assumes the same simulation cost per step as TD-MPC2.
-Sequential runs also evaluate every earlier task, so allow ±30%.
+one curriculum with one seed. They are derived from the speeds of our
+sequential runs on the `main` branch (MuJoCo-Warp) and its measured speed-up
+over this branch (2.7× for TD-MPC2, 1.3× for DreamerV3), giving about 14,000
+steps per hour for TD-MPC2 and 45,000 for DreamerV3. PWM's speed on this
+branch was not measured; its estimate of about 12,000 steps per hour assumes
+the same simulation cost per step as TD-MPC2. Allow ±30%.
 
 | Suite | TD-MPC2 | PWM | DreamerV3 |
 | --- | --- | --- | --- |
-| `reach` | 42 h | 54 h | 50 h |
-| `grasp` | 68 h | 88 h | 35 h |
-| `binpnp` | 166 h | 217 h | 65 h |
-| `pnpblock` | 177 h | 230 h | 62 h |
-| `drawerpnp` | 125 h | 163 h | 50 h |
-| `pnpboxclose` | 166 h | 217 h | 62 h |
-| all six | 743 h | 969 h | 325 h |
+| `reach` | 57 h | 69 h | 18 h |
+| `grasp` | 99 h | 121 h | 31 h |
+| `binpnp` | 227 h | 276 h | 72 h |
+| `pnpblock` | 242 h | 294 h | 76 h |
+| `drawerpnp` | 178 h | 216 h | 56 h |
+| `pnpboxclose` | 227 h | 276 h | 72 h |
+| all six | 1,030 h | 1,252 h | 325 h |
 
 Running every configuration in the sweep files (all methods, encoder variants
-and seeds, plus the single-task runs) takes about 28,000 GPU-hours on this branch,
-and about 13,500 on `main` (MuJoCo-Warp).
+and seeds, plus the single-task runs) takes about 34,000 GPU-hours on this
+branch, and about 16,000 on `main` (MuJoCo-Warp).
 
 ## Citation
 

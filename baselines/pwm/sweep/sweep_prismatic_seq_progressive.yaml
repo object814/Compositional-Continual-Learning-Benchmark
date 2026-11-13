@@ -85,11 +85,11 @@ methods:
         - 180000
       drawerpnp:
         steps:
-        - 100000
+        - 200000
         - 500000
         - 1800000
         buffer_sizes:
-        - 25000
+        - 50000
         - 125000
         - 180000
       pnpblock:
@@ -116,11 +116,11 @@ methods:
         steps:
         - 200000
         - 600000
-        - 500000
+        - 600000
         buffer_sizes:
         - 50000
         - 150000
-        - 125000
+        - 150000
       pnpboxclose:
         steps:
         - 800000
