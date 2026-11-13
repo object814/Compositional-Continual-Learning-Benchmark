@@ -3,8 +3,7 @@
 ### MuJoCo-Warp version
 
 [Project page](https://object814.github.io/Compositional-Continual-Learning/) ·
-[Paper (arXiv)](https://arxiv.org/abs/2609.22055) ·
-[Citation](#citation)
+[Paper (arXiv)](https://arxiv.org/abs/2609.22055)
 
 Haoyu Zhou, Joe Watson, Anson Lei, Ingmar Posner<br>
 Applied Artificial Intelligence Lab (A2I), Oxford Robotics Institute, University of Oxford
@@ -21,7 +20,9 @@ paper's tasks step for step, but GPU physics (float32) and the GPU renderer make
 dynamics differ slightly from the published results (see
 [Speed and consistency](#speed-and-consistency)).
 
-![Overview of the benchmark](https://object814.github.io/Compositional-Continual-Learning/static/images/teaser_figure.png)
+<p align="center">
+  <img src="https://object814.github.io/Compositional-Continual-Learning/static/images/teaser_figure.png" alt="Overview of the benchmark" width="50%">
+</p>
 
 The benchmark arranges Meta-World manipulation tasks into curricula that end
 with a composition task built from the primitives before it. Forward transfer
@@ -316,11 +317,10 @@ paper and in [Appendix B](https://object814.github.io/Compositional-Continual-Le
 ## Compute requirements
 
 Each run uses one GPU. Our runs used one NVIDIA L40S (48 GB) and 64 GB of
-RAM each. The hours below are for one curriculum with one seed. They come from
-the training speed of our sequential runs on this branch: about 38,000 steps
-per hour for TD-MPC2, 24,000 for PWM and 58,000 for DreamerV3. TD-MPC2 and PWM
-slow down as a curriculum goes on, since they evaluate every earlier task and
-PWM adds experts, so allow ±30%.
+RAM each. Training speed in our sequential runs on
+this branch was about 38,000 steps per hour for TD-MPC2, 24,000 for PWM and
+58,000 for DreamerV3; TD-MPC2 and PWM slow down as a curriculum goes on,
+since they evaluate every earlier task and PWM adds experts.
 
 **Smaller models.** We did not sweep model sizes: every run uses TD-MPC2's
 19M-parameter model (PWM builds on it) and DreamerV3's 200M configuration.
