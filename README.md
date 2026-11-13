@@ -322,20 +322,6 @@ per hour for TD-MPC2, 24,000 for PWM and 58,000 for DreamerV3. TD-MPC2 and PWM
 slow down as a curriculum goes on, since they evaluate every earlier task and
 PWM adds experts, so allow ±30%.
 
-| Suite | TD-MPC2 | PWM | DreamerV3 |
-| --- | --- | --- | --- |
-| `reach` | 21 h | 33 h | 14 h |
-| `grasp` | 37 h | 58 h | 24 h |
-| `binpnp` | 84 h | 133 h | 55 h |
-| `pnpblock` | 89 h | 142 h | 59 h |
-| `drawerpnp` | 66 h | 104 h | 43 h |
-| `pnpboxclose` | 84 h | 133 h | 55 h |
-| all six | 381 h | 603 h | 250 h |
-
-Running every configuration in the sweep files (all methods, encoder variants
-and seeds, plus the single-task runs) takes about 16,000 GPU-hours on this
-branch.
-
 **Smaller models.** We did not sweep model sizes: every run uses TD-MPC2's
 19M-parameter model (PWM builds on it) and DreamerV3's 200M configuration.
 Smaller models train faster and are a good place to start. For TD-MPC2 and
@@ -374,18 +360,6 @@ seed-to-seed variation.
 - DreamerV3 steps its environments in its own process instead of in worker
   processes.
 
-## Citation
-
-If you use this benchmark or code, please cite:
-
-```bibtex
-@article{zhou2026benchmarking,
-  title={Benchmarking World Models for Continual Learning on Compositional Tasks},
-  author={Zhou, Haoyu and Watson, Joe and Lei, Anson and Posner, Ingmar},
-  journal={arXiv preprint arXiv:2609.22055},
-  year={2026}
-}
-```
 
 ## License
 
@@ -411,3 +385,8 @@ Meta-World:
   url={https://openreview.net/forum?id=1de3azE606}
 }
 ```
+
+## AI assistance
+
+We used AI assistants (Claude and ChatGPT) to help refactor and document this
+codebase for its open-source release.
