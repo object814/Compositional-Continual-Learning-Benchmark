@@ -109,7 +109,7 @@ methods:
         configs:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
-        - 1500000
+        - 1800000
         dataset_sizes_divisor: 8
       compo_pnpblock:
         configs:
@@ -121,7 +121,7 @@ methods:
         configs:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
-        - 1500000
+        - 1800000
         dataset_sizes_divisor: 8
 matrix:
 - method: regular

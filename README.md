@@ -60,8 +60,7 @@ set -a; source .env; set +a                                      # load W&B sett
 ### Option B: Docker
 
 Needs the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/).
-The image contains only the environment; the repository is mounted at
-`/workspace`, so code changes need no rebuild.
+The repository is mounted at `/workspace`, so code changes need no rebuild.
 
 With Docker Compose:
 
@@ -85,25 +84,12 @@ docker stop cclb                  # `docker start cclb` resumes it
 docker rm -f cclb
 ```
 
-Rebuild only after changing `requirements.txt` or `Dockerfile`. To keep
-training after you leave the shell, start it inside `tmux` (`tmux new -s
-train`, detach with `Ctrl-b d`, reattach with `tmux attach -t train`).
-`.env` is read when the container is created; after editing it, remove and
-recreate the container.
-
 ### Pretrained encoder
 
-The pretrained-encoder runs (TD-MPC2, PWM) load
-[`checkpoints/encoder_ms19.pt`](checkpoints/encoder_ms19.pt), which comes with
-the repository. This CNN encoder was pretrained on demonstrations from all
-benchmark tasks and is kept frozen during training, so these runs have seen
-the full task distribution (the frozen-encoder diagnostic in the
-[paper](https://object814.github.io/Compositional-Continual-Learning/#experimental-setup)).
-
-### Caches
-
-Every cache the code writes (`torch.compile`, Mesa, W&B, ...) goes to
-`.cache/` in the repository, not to your home directory.
+Runs with the pretrained, frozen encoder (TD-MPC2, PWM) load
+[`checkpoints/encoder_ms19.pt`](checkpoints/encoder_ms19.pt), included in the
+repository. It was pretrained on demonstrations from all benchmark tasks (see
+the [paper](https://object814.github.io/Compositional-Continual-Learning/#experimental-setup)).
 
 ## Verify the installation
 
@@ -112,10 +98,8 @@ python scripts/check_env.py           # every line should read [ok]
 python scripts/launch.py tdmpc2 sweep_sequential_regular.yaml --smoke --taskset grasp --encoder scratch
 ```
 
-`check_env.py` checks packages and the GPU, and builds and renders all
-benchmark tasks. `--smoke` trains for 3,000 steps per task and keeps no
-output. With several GPUs, select one first, for example
-`export CUDA_VISIBLE_DEVICES=1`.
+`check_env.py` checks the packages and the GPU and builds every task;
+`--smoke` trains for 3,000 steps per task and keeps no output.
 
 ## The benchmark
 
@@ -201,10 +185,6 @@ scripts/launch.py      runs a sweep configuration
 scripts/check_env.py   installation check
 ```
 
-Each experiment is a YAML file in `baselines/<baseline>/sweep/`.
-`scripts/launch.py` expands it into runs (tasksets × seeds × encoder
-variants) and runs them one after another.
-
 ## Training
 
 Every experiment is a sweep file in `baselines/<baseline>/sweep/`, started
@@ -266,127 +246,56 @@ Useful options:
 | `--encoder scratch` or `pretrained` | only this encoder variant (TD-MPC2, PWM) |
 | `--rerun-failed` | skip runs that already finished |
 
-Logs go to
-`baselines/<baseline>/sweep/logdir/cpu/`, and metrics to Weights & Biases as
-set in `.env`. W&B run names and groups start with `cpu_` (`gpu_warp_` on the
-`main` branch), so runs of the two versions never share a log directory
-or a W&B run.
+Logs go to `baselines/<baseline>/sweep/logdir/cpu/` and metrics to
+Weights & Biases, with run names starting with `cpu_` (`gpu_warp_` on
+`main`).
 
-**Resuming.** If a run stops, run the same command again (add
-`--rerun-failed` to skip finished runs). Each task's models, and what the
-method carries to later tasks (ER episodes, EWC Fisher, PackNet masks), are
-saved when the task ends, and `sequential_progress.json` in the run's log
-directory records which tasks are complete. A resumed run skips those and
-starts the first unfinished task again from its beginning, seeded as in an
-uninterrupted run; nothing is saved during a task, so training is not slowed
-down. In Weights & Biases the resumed run continues in a new run holding the
-history of the completed tasks; the interrupted one is moved to the group
-`<group>_failed`. Single-task runs of every baseline restart from the
-beginning in the same way; their model is saved once, when training ends.
-A finished run is never overwritten: without `--rerun-failed`, running it
-again trains a new copy in `<logdir>_<timestamp>`, logged to Weights & Biases
-as `<run name>_<timestamp>`.
+**Resuming.** Run the same command again. Sequential runs save their models
+at the end of each task and restart from the beginning of the first
+unfinished task; single-task runs start over. `--rerun-failed` skips runs that
+already finished; without it, a finished run is trained again as a new copy.
 
 ## Evaluation protocol
 
-To compare a new method with the results below, keep the following fixed.
-
-**Training.** Each suite is trained in order, with the per-task budgets below
-and seeds 0, 1 and 2. Every task starts with a fresh replay buffer, so only
-what the method itself carries over (weights, ER episodes, EWC Fisher
-information, PackNet masks) crosses a task boundary. A shared backbone
-(encoder, dynamics model and decoder, if any) learns across all tasks; each
-task gets its own reward, actor and critic heads, which are frozen when the
-task ends. Earlier tasks are evaluated with their stored heads and the current
+Each suite is trained in order with seeds 0, 1 and 2. Every task starts with
+a fresh replay buffer, so only what the method carries over (weights, ER
+episodes, EWC Fisher information, PackNet masks) crosses a task boundary. A
+shared backbone (encoder, dynamics model and decoder, if any) learns across
+tasks; each task has its own reward, actor and critic heads, frozen when the
+task ends, and earlier tasks are evaluated with their heads and the current
 backbone.
 
-Budgets per task, in millions of steps, in curriculum order. They are the
-same for every baseline:
+**Budgets.** The sweep files use the budgets below, in millions of agent
+steps per task. They are a reference rather than part of the benchmark: FWT
+and BWT normalise out the number of steps, so other budgets work as long as
+the composition task gets the same budget in the curriculum as in its
+single-task reference run.
 
-| Suite | Budget per task |
-| --- | --- |
-| `reach` | 0.2, 0.2, 0.2, 0.2 |
-| `grasp` | 0.2, 0.6, 0.6 |
-| `binpnp` | 0.8, 0.8, 0.8, 0.8 |
-| `pnpblock` | 0.8, 0.8, 1.8 |
-| `drawerpnp` | 0.2, 0.5, 1.8 |
-| `pnpboxclose` | 0.8, 0.6, 1.8 |
-
-TD-MPC2 and PWM count agent steps: each action is repeated twice, and an
-episode lasts 250 agent steps (500 simulator steps). DreamerV3 repeats no
-actions, and its episodes last 250 steps. The sweep files in
-`baselines/<baseline>/sweep/` hold these budgets and every other setting.
-
-<details>
-<summary>Budgets of the paper's runs</summary>
-
-The [reference results](#reference-results) come from runs with per-baseline
-budgets, in millions of steps:
-
-| Suite | TD-MPC2, PWM | DreamerV3 |
+| Suite | Budget per task | Single-task reference |
 | --- | --- | --- |
-| `reach` | 0.2, 0.2, 0.2, 0.2 | 0.4, 0.4, 0.4, 0.5 |
-| `grasp` | 0.2, 0.6, 0.5 | 0.2, 0.4, 0.6 |
-| `binpnp` | 0.8, 0.8, 0.8, 0.8 | 0.7, 0.5, 0.5, 0.5 |
-| `pnpblock` | 0.8, 0.8, 1.8 | 0.8, 0.5, 0.8 |
-| `drawerpnp` | 0.1, 0.5, 1.8 | 0.2, 0.5, 1.0 |
-| `pnpboxclose` | 0.8, 0.6, 1.8 | 0.8, 0.5, 0.8 |
+| `reach` | 0.2, 0.2, 0.2, 0.2 | `reach_xyz` |
+| `grasp` | 0.2, 0.6, 0.6 | `pnpcube` |
+| `binpnp` | 0.8, 0.8, 0.8, 0.8 | `binpnp` |
+| `pnpblock` | 0.8, 0.8, 1.8 | `compo_pnpblock` |
+| `drawerpnp` | 0.2, 0.5, 1.8 | `compo_drawerpnp` |
+| `pnpboxclose` | 0.8, 0.6, 1.8 | `compo_pnpboxclose` |
 
-The single-task budgets differed between baselines too. The sweep files at
-commit `7cd687d` of the `mujoco-cpu` branch hold all of the paper's budgets.
+TD-MPC2 and PWM repeat each action twice (episodes of 250 agent steps, 500
+simulator steps); DreamerV3 repeats none (episodes of 250 steps).
 
-</details>
-
-**Evaluation.** During sequential training, every task seen so far is
-evaluated at a fixed interval: TD-MPC2 and PWM every 5,000 steps over 5
-episodes, DreamerV3 every 10,000 steps over 10 episodes. The episode returns
-are logged to W&B as `eval/task<i>_<task>/episode_reward` (TD-MPC2, PWM) and
-`eval_task<i>_<task>/eval_return` (DreamerV3).
-
-**Metrics.** Forward transfer (FWT↑: how much the earlier tasks help on the
-final composition task, compared with learning it from scratch) and backward
-transfer (BWT↓: forgetting of the earlier tasks) are defined in
-[Appendix A of the project page](https://object814.github.io/Compositional-Continual-Learning/#appendix-a). Both are computed on
-expert-normalised returns, R = 100 · (return − f) / (R<sub>expert</sub> − f),
-where the floor f is the return of an episode that gets the worst reward at
-every simulator step (−500 for TD-MPC2 and PWM, −250 for DreamerV3), and
-R<sub>expert</sub> is the best of 10 rollouts of a privileged, state-based
-scripted policy, listed in
-[`expert_return.txt`](baselines/pwm/tdmpc2/expert_reuse/expert_return.txt).
-So 0 is total failure and 100 matches the scripted policy. Curves are averaged
-over the three seeds before the metrics are computed. The from-scratch
-reference for FWT is this single-task configuration:
-
-| Suite | Final task | Single-task taskset (`sweep_single*.yaml`) | Budget (M steps) |
-| --- | --- | --- | --- |
-| `reach` | reach-xyz | `reach_xyz` | 0.2 |
-| `grasp` | pick-place | `pnpcube` | 0.6 |
-| `binpnp` | bin-picking-yellowpurple | `binpnp` | 0.8 |
-| `pnpblock` | compo-pickplace-block | `compo_pnpblock` | 1.8 |
-| `drawerpnp` | compo-draweropen-pickplace | `compo_drawerpnp` | 1.5 |
-| `pnpboxclose` | compo-pickplace-boxclose | `compo_pnpboxclose` | 1.5 |
-
-## Reference results
-
-From the paper, run with this branch; means over three seeds. FT is
-sequential fine-tuning (`regular` in the sweep files). These runs used the
-paper's per-baseline budgets (see [Evaluation protocol](#evaluation-protocol)).
-
-Averages over the six suites:
-
-| | FT BWT↓ | FT FWT↑ | ER BWT↓ | ER FWT↑ | EWC BWT↓ | EWC FWT↑ | PackNet BWT↓ | PackNet FWT↑ |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| DreamerV3 | 34.14 | 26.18 | 15.69 | 33.55 | 12.95 | −1.42 | 1.04 | 23.86 |
-| TD-MPC2 | 75.91 | 7.57 | 62.25 | 10.65 | 68.52 | −3.63 | 4.86 | 7.31 |
-
-| | Scratch encoder BWT↓ | Scratch encoder FWT↑ | Pretrained frozen encoder BWT↓ | Pretrained frozen encoder FWT↑ |
-| --- | --- | --- | --- | --- |
-| PWM | 79.21 | 2.41 | 3.85 | 36.18 |
-| TD-MPC2 (FT) | 75.91 | 7.57 | 34.97 | 38.11 |
-
-Per-suite scores are in [Appendix B](https://object814.github.io/Compositional-Continual-Learning/#appendix-b) of the project page,
-and the learning curves for every suite and method in
-[Appendix C](https://object814.github.io/Compositional-Continual-Learning/#appendix-c).
+**Metrics.** Every task seen so far is evaluated during training: TD-MPC2 and
+PWM every 5,000 steps over 5 episodes (W&B key
+`eval/task<i>_<task>/episode_reward`), DreamerV3 every 10,000 steps over 10
+episodes (`eval_task<i>_<task>/eval_return`). Returns are expert-normalised,
+R = 100 · (return − f) / (R<sub>expert</sub> − f), where f is the return of an
+episode with the worst reward at every simulator step (−500 for TD-MPC2 and
+PWM, −250 for DreamerV3) and R<sub>expert</sub> is the best of 10 scripted-expert
+rollouts
+([`expert_return.txt`](baselines/pwm/tdmpc2/expert_reuse/expert_return.txt)).
+Forward transfer (FWT↑) and backward transfer (BWT↓) are computed on these
+curves, averaged over seeds, as defined in
+[Appendix A of the project page](https://object814.github.io/Compositional-Continual-Learning/#appendix-a). Our results are in the
+paper and in [Appendix B](https://object814.github.io/Compositional-Continual-Learning/#appendix-b).
 
 ## Compute requirements
 
@@ -410,8 +319,17 @@ the same simulation cost per step as TD-MPC2. Allow ±30%.
 | all six | 1,030 h | 1,252 h | 325 h |
 
 Running every configuration in the sweep files (all methods, encoder variants
-and seeds, plus the single-task runs) takes about 34,000 GPU-hours on this
+and seeds, plus the single-task runs) takes about 35,000 GPU-hours on this
 branch, and about 16,000 on `main` (MuJoCo-Warp).
+
+**Smaller models.** We did not sweep model sizes: every run uses TD-MPC2's
+19M-parameter model (PWM builds on it) and DreamerV3's 200M configuration.
+Smaller models train faster and are a good place to start. For TD-MPC2 and
+PWM, set `model_size` in the sweep files to 1 or 5 (with `--encoder scratch`;
+the pretrained encoder fits size 19 only). For DreamerV3, reduce `dyn_hidden`,
+`dyn_deter`, `units` and the encoder and decoder `cnn_depth` and `mlp_units`
+of `metaworld_visual_200M_heavy_long_speedup` in
+`baselines/dreamerv3/configs.yaml`.
 
 ## Citation
 

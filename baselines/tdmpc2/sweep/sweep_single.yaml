@@ -71,7 +71,7 @@ tasksets:
     model_size: 19
   compo_drawerpnp:
     task: metaworld_compo-draweropen-pickplace
-    steps: 1500000
+    steps: 1800000
     buffer_size: 180000
     model_size: 19
   compo_pnpblock:
@@ -81,7 +81,7 @@ tasksets:
     model_size: 19
   compo_pnpboxclose:
     task: metaworld_compo-pickplace-boxclose
-    steps: 1500000
+    steps: 1800000
     buffer_size: 180000
     model_size: 19
 methods:
