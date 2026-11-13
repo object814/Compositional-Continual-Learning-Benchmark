@@ -63,10 +63,10 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         - metaworld_visual_200M_heavy_long_speedup
         steps:
-        - 700000
-        - 500000
-        - 500000
-        - 500000
+        - 800000
+        - 800000
+        - 800000
+        - 800000
         dataset_sizes_divisor: 8
       drawerpnp:
         configs:
@@ -76,7 +76,7 @@ methods:
         steps:
         - 200000
         - 500000
-        - 1000000
+        - 1800000
         dataset_sizes_divisor: 8
       pnpblock:
         configs:
@@ -85,8 +85,8 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
         - 800000
-        - 500000
         - 800000
+        - 1800000
         dataset_sizes_divisor: 8
       reach:
         configs:
@@ -95,10 +95,10 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         - metaworld_visual_200M_heavy_long_speedup
         steps:
-        - 400000
-        - 400000
-        - 400000
-        - 500000
+        - 200000
+        - 200000
+        - 200000
+        - 200000
         dataset_sizes_divisor: 8
       grasp:
         configs:
@@ -107,7 +107,7 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
         - 200000
-        - 400000
+        - 600000
         - 600000
         dataset_sizes_divisor: 8
       pnpboxclose:
@@ -117,8 +117,8 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
         - 800000
-        - 500000
-        - 800000
+        - 600000
+        - 1800000
         dataset_sizes_divisor: 8
   er:
     entry: er_training/dreamer_sequential_er.py
@@ -137,10 +137,10 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         - metaworld_visual_200M_heavy_long_speedup
         steps:
-        - 700000
-        - 500000
-        - 500000
-        - 500000
+        - 800000
+        - 800000
+        - 800000
+        - 800000
         dataset_sizes_divisor: 8
       drawerpnp:
         configs:
@@ -150,7 +150,7 @@ methods:
         steps:
         - 200000
         - 500000
-        - 1000000
+        - 1800000
         dataset_sizes_divisor: 8
       pnpblock:
         configs:
@@ -159,8 +159,8 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
         - 800000
-        - 500000
         - 800000
+        - 1800000
         dataset_sizes_divisor: 8
       reach:
         configs:
@@ -169,10 +169,10 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         - metaworld_visual_200M_heavy_long_speedup
         steps:
-        - 400000
-        - 400000
-        - 400000
-        - 500000
+        - 200000
+        - 200000
+        - 200000
+        - 200000
         dataset_sizes_divisor: 8
       grasp:
         configs:
@@ -181,7 +181,7 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
         - 200000
-        - 400000
+        - 600000
         - 600000
         dataset_sizes_divisor: 8
       pnpboxclose:
@@ -191,8 +191,8 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
         - 800000
-        - 500000
-        - 800000
+        - 600000
+        - 1800000
         dataset_sizes_divisor: 8
   ewc:
     entry: ewc_training/dreamer_sequential_ewc.py
@@ -211,10 +211,10 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup_ewc
         - metaworld_visual_200M_heavy_long_speedup_ewc
         steps:
-        - 700000
-        - 500000
-        - 500000
-        - 500000
+        - 800000
+        - 800000
+        - 800000
+        - 800000
         dataset_sizes_divisor: 8
       drawerpnp:
         configs:
@@ -224,7 +224,7 @@ methods:
         steps:
         - 200000
         - 500000
-        - 1000000
+        - 1800000
         dataset_sizes_divisor: 8
       pnpblock:
         configs:
@@ -233,8 +233,8 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup_ewc
         steps:
         - 800000
-        - 500000
         - 800000
+        - 1800000
         dataset_sizes_divisor: 8
       reach:
         configs:
@@ -243,10 +243,10 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup_ewc
         - metaworld_visual_200M_heavy_long_speedup_ewc
         steps:
-        - 400000
-        - 400000
-        - 400000
-        - 500000
+        - 200000
+        - 200000
+        - 200000
+        - 200000
         dataset_sizes_divisor: 8
       grasp:
         configs:
@@ -255,7 +255,7 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup_ewc
         steps:
         - 200000
-        - 400000
+        - 600000
         - 600000
         dataset_sizes_divisor: 8
       pnpboxclose:
@@ -265,8 +265,8 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup_ewc
         steps:
         - 800000
-        - 500000
-        - 800000
+        - 600000
+        - 1800000
         dataset_sizes_divisor: 8
   packnet:
     entry: packnet_training/dreamer_sequential_packnet.py
@@ -285,10 +285,10 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         - metaworld_visual_200M_heavy_long_speedup
         steps:
-        - 700000
-        - 500000
-        - 500000
-        - 500000
+        - 800000
+        - 800000
+        - 800000
+        - 800000
         dataset_sizes_divisor: 8
       drawerpnp:
         configs:
@@ -298,7 +298,7 @@ methods:
         steps:
         - 200000
         - 500000
-        - 1000000
+        - 1800000
         dataset_sizes_divisor: 8
       pnpblock:
         configs:
@@ -307,8 +307,8 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
         - 800000
-        - 500000
         - 800000
+        - 1800000
         dataset_sizes_divisor: 8
       reach:
         configs:
@@ -317,10 +317,10 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         - metaworld_visual_200M_heavy_long_speedup
         steps:
-        - 400000
-        - 400000
-        - 400000
-        - 500000
+        - 200000
+        - 200000
+        - 200000
+        - 200000
         dataset_sizes_divisor: 8
       grasp:
         configs:
@@ -329,7 +329,7 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
         - 200000
-        - 400000
+        - 600000
         - 600000
         dataset_sizes_divisor: 8
       pnpboxclose:
@@ -339,8 +339,8 @@ methods:
         - metaworld_visual_200M_heavy_long_speedup
         steps:
         - 800000
-        - 500000
-        - 800000
+        - 600000
+        - 1800000
         dataset_sizes_divisor: 8
 matrix:
 - method: regular
